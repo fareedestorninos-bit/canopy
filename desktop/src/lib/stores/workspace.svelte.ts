@@ -3,6 +3,7 @@ import { browser } from "$app/environment";
 import { isTauri } from "$lib/utils/platform";
 import type { Workspace as BackendWorkspace } from "$api/types";
 import { toastStore } from "./toasts.svelte";
+import { workspaces as workspacesApi, isMockEnabled } from "$api/client";
 
 /**
  * Extract the `description` field from YAML frontmatter in a markdown file.
@@ -300,8 +301,26 @@ class WorkspaceStore {
     const rawPath =
       directory ?? `~/.canopy/${name.toLowerCase().replace(/\s+/g, "-")}`;
     const resolvedPath = await resolveHomePath(rawPath);
+
+    let backendId: string | null = null;
+
+    // Create workspace in backend so agents can reference it
+    if (!isMockEnabled()) {
+      try {
+        const created = await workspacesApi.create({
+          name,
+          path: resolvedPath,
+        });
+        backendId =
+          (created as any).workspace?.id ?? (created as any).id ?? null;
+      } catch (e) {
+        // Backend create failed — fall back to local-only
+        console.warn("[WorkspaceStore] Backend workspace create failed:", e);
+      }
+    }
+
     const ws: LocalWorkspace = {
-      id: crypto.randomUUID(),
+      id: backendId ?? crypto.randomUUID(),
       path: resolvedPath,
       name,
       addedAt: new Date().toISOString(),

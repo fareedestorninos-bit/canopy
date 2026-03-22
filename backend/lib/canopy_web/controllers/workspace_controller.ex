@@ -64,6 +64,8 @@ defmodule CanopyWeb.WorkspaceController do
   end
 
   def create(conn, params) do
+    user = conn.assigns[:current_user]
+    params = Map.put_new(params, "owner_id", user.id)
     changeset = Workspace.changeset(%Workspace{}, params)
 
     case Repo.insert(changeset) do
