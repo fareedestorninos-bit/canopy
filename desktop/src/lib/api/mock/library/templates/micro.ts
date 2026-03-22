@@ -13,7 +13,7 @@ export const agents: CanopyAgent[] = [
     avatar_emoji: "⚡",
     role: "agent",
     status: "idle",
-    adapter: "claude_code",
+    adapter: "claude-code",
     model: "claude-sonnet-4-20250514",
     system_prompt:
       "You are a focused single-purpose agent. You receive a task, execute it with precision, and return a structured result. You do not scope-creep or take on work outside your assigned task.",

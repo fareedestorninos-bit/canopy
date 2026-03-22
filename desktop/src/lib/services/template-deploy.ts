@@ -15,6 +15,7 @@ export interface DeployResult {
   agentCount: number;
   failedAgents: Array<{ name: string; error: string }>;
   error?: string;
+  warnings?: string[];
 }
 
 /**
@@ -153,19 +154,29 @@ async function registerAgents(
       const { agents: agentsApi } = await import("$api/client");
 
       const results = await Promise.allSettled(
-        agents.map((agent) =>
-          agentsApi.create({
+        agents.map((agent) => {
+          // Derive slug from agent.name (the short ID, e.g. "growth-director")
+          const slug = (agent.name || agent.display_name || "agent")
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "");
+
+          // Normalize adapter: template may use underscores, schema requires hyphens
+          const adapter = (agent.adapter || "claude-code").replace(/_/g, "-");
+
+          return agentsApi.create({
+            slug,
             name: agent.display_name || agent.name,
-            display_name: agent.display_name,
-            avatar_emoji: agent.avatar_emoji,
             role: agent.role,
-            adapter: agent.adapter,
-            model: agent.model,
+            adapter,
+            model: agent.model || "sonnet",
+            workspace_id: workspaceId,
+            avatar_emoji: agent.avatar_emoji,
             system_prompt: agent.system_prompt,
-            config: { ...agent.config, workspace_id: workspaceId },
-            skills: agent.skills,
-          }),
-        ),
+            config: agent.config || {},
+          });
+        }),
       );
 
       // Collect failed registrations

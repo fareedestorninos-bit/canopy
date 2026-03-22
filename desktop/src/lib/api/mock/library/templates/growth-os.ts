@@ -23,7 +23,7 @@ function agent(
     avatar_emoji: emoji,
     role,
     status: "idle",
-    adapter: "claude_code",
+    adapter: "claude-code",
     model: "claude-sonnet-4-20250514",
     system_prompt: `${name} — ${division} division agent for the Growth OS.`,
     config: {
