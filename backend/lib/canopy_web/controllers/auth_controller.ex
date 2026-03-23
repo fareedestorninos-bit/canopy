@@ -41,45 +41,38 @@ defmodule CanopyWeb.AuthController do
     |> json(%{error: "invalid_request", details: "Missing email or password"})
   end
 
-  def register(conn, %{"name" => name, "email" => email, "password" => password}) do
-    # First ever registration becomes admin; all subsequent users are members
-    user_count = Repo.aggregate(User, :count)
-    role = if user_count == 0, do: "admin", else: "member"
+  def register(conn, %{"name" => _, "email" => _, "password" => password} = params)
+      when byte_size(password) >= 8 do
+    changeset = User.changeset(%User{}, params)
 
-    case Canopy.Accounts.create_user(%{
-           name: name,
-           email: email,
-           password: password,
-           role: role,
-           provider: "local"
-         }) do
+    case Repo.insert(changeset) do
       {:ok, user} ->
         {:ok, token, _claims} =
           Canopy.Guardian.encode_and_sign(user, %{"role" => user.role}, ttl: {1, :hour})
-
-        workspace_path = Path.join([System.get_env("HOME") || "/tmp", ".canopy", "default"])
-
-        {:ok, workspace} =
-          Canopy.Workspaces.create_workspace(%{
-            name: "#{name}'s Workspace",
-            path: workspace_path,
-            status: "active",
-            owner_id: user.id
-          })
 
         conn
         |> put_status(201)
         |> json(%{
           token: token,
-          user: %{id: user.id, name: user.name, email: user.email, role: user.role},
-          workspace: %{id: workspace.id, name: workspace.name}
+          user: %{
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          }
         })
 
       {:error, changeset} ->
         conn
         |> put_status(422)
-        |> json(%{error: "registration_failed", details: format_errors(changeset)})
+        |> json(%{error: "validation_failed", details: format_errors(changeset)})
     end
+  end
+
+  def register(conn, %{"password" => password}) when byte_size(password) < 8 do
+    conn
+    |> put_status(422)
+    |> json(%{error: "validation_failed", details: %{password: ["must be at least 8 characters"]}})
   end
 
   def register(conn, _params) do
@@ -89,12 +82,23 @@ defmodule CanopyWeb.AuthController do
   end
 
   def status(conn, _params) do
-    user_count = Repo.aggregate(User, :count)
-
-    json(conn, %{
-      has_users: user_count > 0,
-      registration_open: true
-    })
+    with ["Bearer " <> token] <- get_req_header(conn, "authorization"),
+         {:ok, claims} <- Canopy.Guardian.decode_and_verify(token),
+         {:ok, user} <- Canopy.Guardian.resource_from_claims(claims) do
+      json(conn, %{
+        authenticated: true,
+        user: %{
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        },
+        expires_at: claims["exp"]
+      })
+    else
+      _ ->
+        json(conn, %{authenticated: false})
+    end
   end
 
   def refresh(conn, _params) do

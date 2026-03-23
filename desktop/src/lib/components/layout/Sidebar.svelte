@@ -6,6 +6,7 @@
   import { workspaceStore } from '$lib/stores/workspace.svelte';
   import { agentsStore } from '$lib/stores/agents.svelte';
   import { approvalsStore } from '$lib/stores/approvals.svelte';
+  import { hierarchyStore } from '$lib/stores/hierarchy.svelte';
   import WorkspaceSwitcher from './WorkspaceSwitcher.svelte';
   import SidebarNavItem from './SidebarNavItem.svelte';
   import SidebarSection from './SidebarSection.svelte';
@@ -72,6 +73,7 @@
     approvals:    'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
     alerts:       'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0',
     integrations: 'M13.5 16.875h3.375m0 0h3.375m-3.375 0V13.5m0 3.375v3.375M6 10.5h2.25a2.25 2.25 0 002.25-2.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v2.25A2.25 2.25 0 006 10.5zm0 9.75h2.25A2.25 2.25 0 0010.5 18v-2.25a2.25 2.25 0 00-2.25-2.25H6a2.25 2.25 0 00-2.25 2.25V18A2.25 2.25 0 006 20.25zm9.75-9.75H18a2.25 2.25 0 002.25-2.25V6A2.25 2.25 0 0018 3.75h-2.25A2.25 2.25 0 0013.5 6v2.25a2.25 2.25 0 002.25 2.25z',
+    plugins:      'M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 00.659-.663 47.703 47.703 0 00-.31-4.82 47.872 47.872 0 00-4.726.447.532.532 0 01-.57-.533z',
     users:        'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z',
     audit:        'M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25',
     gateways:     'M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z',
@@ -79,7 +81,14 @@
     library:      'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25',
     templates:    'M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776',
     workspaces:   'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125',
+    secrets:      'M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z',
+    access:       'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z',
+    execWorkspaces: 'M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5',
     terminal:     'M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z',
+    hierarchy:    'M3 6l3-3 3 3M6 3v13M21 6l-3-3-3 3M18 3v13M3 21h18M3 17h6M15 17h6',
+    divisions:    'M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21',
+    departments:  'M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21',
+    teams:        'M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z',
     hamburger:    'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
     close:        'M6 18L18 6M6 6l12 12',
     search:       'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 10.607z',
@@ -158,6 +167,16 @@
 
       <div class="sb-divider" aria-hidden="true"></div>
 
+      <!-- STRUCTURE -->
+      <SidebarSection label="Structure">
+        <SidebarNavItem href="/app/hierarchy" label="Hierarchy" icon={ICONS.hierarchy} active={isActive('/app/hierarchy')} />
+        <SidebarNavItem href="/app/divisions" label="Divisions" icon={ICONS.divisions} active={isActive('/app/divisions')} />
+        <SidebarNavItem href="/app/departments" label="Departments" icon={ICONS.departments} active={isActive('/app/departments')} />
+        <SidebarNavItem href="/app/teams" label="Teams" icon={ICONS.teams} active={isActive('/app/teams')} />
+      </SidebarSection>
+
+      <div class="sb-divider" aria-hidden="true"></div>
+
       <!-- PROJECTS -->
       <SidebarSection label="Projects">
         {#if workspaceStore.workspaces.length === 0}
@@ -182,23 +201,29 @@
         {#if agentsStore.agents.length === 0}
           <div class="sb-empty">No agents</div>
         {:else}
-          {@const grouped = (() => {
-            const groups = new Map<string, import('$api/types').CanopyAgent[]>();
-            for (const agent of agentsStore.agents) {
-              const div = (agent.config?.division as string) || 'team';
-              const list = groups.get(div) ?? [];
-              list.push(agent);
-              groups.set(div, list);
-            }
-            return [...groups.entries()]
-              .sort(([a], [b]) => (DIVISION_META[a]?.order ?? 99) - (DIVISION_META[b]?.order ?? 99));
-          })()}
-          {#if grouped.length > 1}
-            <!-- Division-grouped view -->
-            {#each grouped as [divKey, divAgents] (divKey)}
-              {@const meta = DIVISION_META[divKey]}
-              <SidebarSection label="{meta?.emoji ?? '📁'} {meta?.label ?? divKey}" badge={divAgents.length} defaultOpen={divKey === 'core'}>
-                {#each divAgents as agent (agent.id)}
+          {@const hasTeams = hierarchyStore.teams.length > 0}
+          {#if hasTeams}
+            <!-- Group agents by real org team membership -->
+            {@const teamMap = (() => {
+              const map = new Map<string, { name: string; agents: import('$api/types').CanopyAgent[] }>();
+              // Initialize all teams
+              for (const t of hierarchyStore.teams) {
+                map.set(t.id, { name: t.name, agents: [] });
+              }
+              // Assign agents to their teams
+              const unassigned: import('$api/types').CanopyAgent[] = [];
+              for (const agent of agentsStore.agents) {
+                if (agent.team_id && map.has(agent.team_id)) {
+                  map.get(agent.team_id)!.agents.push(agent);
+                } else {
+                  unassigned.push(agent);
+                }
+              }
+              return { teams: [...map.entries()].filter(([, v]) => v.agents.length > 0), unassigned };
+            })()}
+            {#each teamMap.teams as [teamId, teamData] (teamId)}
+              <SidebarSection label={teamData.name} badge={teamData.agents.length} defaultOpen={true}>
+                {#each teamData.agents as agent (agent.id)}
                   <SidebarNavItem
                     href="/app/agents/{agent.id}"
                     label={agent.display_name || agent.name}
@@ -208,16 +233,55 @@
                 {/each}
               </SidebarSection>
             {/each}
+            {#if teamMap.unassigned.length > 0}
+              <SidebarSection label="Unassigned" badge={teamMap.unassigned.length} defaultOpen={false}>
+                {#each teamMap.unassigned.slice(0, 8) as agent (agent.id)}
+                  <SidebarNavItem
+                    href="/app/agents/{agent.id}"
+                    label={agent.display_name || agent.name}
+                    icon={ICONS.agent}
+                    active={isActive(`/app/agents/${agent.id}`)}
+                  />
+                {/each}
+              </SidebarSection>
+            {/if}
           {:else}
-            <!-- Flat list (single group or no divisions) -->
-            {#each agentsStore.agents.slice(0, 8) as agent (agent.id)}
-              <SidebarNavItem
-                href="/app/agents/{agent.id}"
-                label={agent.display_name || agent.name}
-                icon={ICONS.agent}
-                active={isActive(`/app/agents/${agent.id}`)}
-              />
-            {/each}
+            <!-- Fallback: group by config.division when no real teams exist -->
+            {@const grouped = (() => {
+              const groups = new Map<string, import('$api/types').CanopyAgent[]>();
+              for (const agent of agentsStore.agents) {
+                const div = (agent.config?.division as string) || 'team';
+                const list = groups.get(div) ?? [];
+                list.push(agent);
+                groups.set(div, list);
+              }
+              return [...groups.entries()]
+                .sort(([a], [b]) => (DIVISION_META[a]?.order ?? 99) - (DIVISION_META[b]?.order ?? 99));
+            })()}
+            {#if grouped.length > 1}
+              {#each grouped as [divKey, divAgents] (divKey)}
+                {@const meta = DIVISION_META[divKey]}
+                <SidebarSection label="{meta?.emoji ?? '📁'} {meta?.label ?? divKey}" badge={divAgents.length} defaultOpen={divKey === 'core'}>
+                  {#each divAgents as agent (agent.id)}
+                    <SidebarNavItem
+                      href="/app/agents/{agent.id}"
+                      label={agent.display_name || agent.name}
+                      icon={ICONS.agent}
+                      active={isActive(`/app/agents/${agent.id}`)}
+                    />
+                  {/each}
+                </SidebarSection>
+              {/each}
+            {:else}
+              {#each agentsStore.agents.slice(0, 8) as agent (agent.id)}
+                <SidebarNavItem
+                  href="/app/agents/{agent.id}"
+                  label={agent.display_name || agent.name}
+                  icon={ICONS.agent}
+                  active={isActive(`/app/agents/${agent.id}`)}
+                />
+              {/each}
+            {/if}
           {/if}
           <SidebarNavItem href="/app/agents" label="View all ({agentsStore.agents.length})" icon={ICONS.agent} active={currentPath === '/app/agents'} />
         {/if}
@@ -251,6 +315,7 @@
         <SidebarNavItem href="/app/webhooks" label="Webhooks" icon={ICONS.webhooks} active={isActive('/app/webhooks')} />
         <SidebarNavItem href="/app/alerts" label="Alerts" icon={ICONS.alerts} active={isActive('/app/alerts')} />
         <SidebarNavItem href="/app/integrations" label="Integrations" icon={ICONS.integrations} active={isActive('/app/integrations')} />
+        <SidebarNavItem href="/app/plugins" label="Plugins" icon={ICONS.plugins} active={isActive('/app/plugins')} />
       </SidebarSection>
 
       <div class="sb-divider" aria-hidden="true"></div>
@@ -258,11 +323,15 @@
       <!-- ADMIN (collapsed by default) -->
       <SidebarSection label="Admin" defaultOpen={false}>
         <SidebarNavItem href="/app/users" label="Users" icon={ICONS.users} active={isActive('/app/users')} />
+        <SidebarNavItem href="/app/organizations" label="Organizations" icon={ICONS.workspaces} active={isActive('/app/organizations')} />
         <SidebarNavItem href="/app/audit" label="Audit" icon={ICONS.audit} active={isActive('/app/audit')} />
         <SidebarNavItem href="/app/gateways" label="Gateways" icon={ICONS.gateways} active={isActive('/app/gateways')} />
         <SidebarNavItem href="/app/config" label="Config" icon={ICONS.config} active={isActive('/app/config')} />
         <SidebarNavItem href="/app/templates" label="Templates" icon={ICONS.templates} active={isActive('/app/templates')} />
         <SidebarNavItem href="/app/workspaces" label="Workspaces" icon={ICONS.workspaces} active={isActive('/app/workspaces')} />
+        <SidebarNavItem href="/app/secrets" label="Secrets" icon={ICONS.secrets} active={isActive('/app/secrets')} />
+        <SidebarNavItem href="/app/access" label="Access" icon={ICONS.access} active={isActive('/app/access')} />
+        <SidebarNavItem href="/app/execution-workspaces" label="Exec Workspaces" icon={ICONS.execWorkspaces} active={isActive('/app/execution-workspaces')} />
       </SidebarSection>
     {:else}
       <!-- Collapsed icon-only mode for secondary sections -->

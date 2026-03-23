@@ -972,10 +972,10 @@ export const goals = {
     return data.goals ?? [];
   },
   get: (id: string) => request<{ goal: Goal }>(`/goals/${id}`),
-  create: (_projectId: string, body: Partial<Goal>) =>
+  create: (projectId: string, body: Partial<Goal>) =>
     request<Goal>("/goals", {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, project_id: projectId }),
     }),
   update: (_projectId: string, id: string, body: Partial<Goal>) =>
     request<Goal>(`/goals/${id}`, {

@@ -82,7 +82,13 @@ class GoalsStore {
     }
     this.loading = true;
     try {
-      const created = await goalsApi.create(this.activeProjectId, data);
+      // Inject workspace_id from the workspace store
+      const { workspaceStore } = await import("./workspace.svelte");
+      const enriched = {
+        ...data,
+        workspace_id: workspaceStore.activeWorkspaceId ?? undefined,
+      };
+      const created = await goalsApi.create(this.activeProjectId, enriched);
       // Re-fetch the full tree to get correct children/issue_count
       await this.fetchGoals(this.activeProjectId);
       this.error = null;
