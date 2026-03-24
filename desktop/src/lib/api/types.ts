@@ -1470,3 +1470,97 @@ export interface DatasetPreviewResponse {
   total: number;
   preview_limit: number;
 }
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export type NotificationCategory =
+  | "task"
+  | "approval"
+  | "alert"
+  | "mention"
+  | "system"
+  | "budget"
+  | "workflow";
+
+export type NotificationSeverity = "info" | "warning" | "error" | "critical";
+
+export interface Notification {
+  id: string;
+  workspace_id: string;
+  recipient_type: "user" | "agent" | "team" | "broadcast";
+  recipient_id: string | null;
+  sender_type: "system" | "agent" | "user" | "workflow" | null;
+  sender_id: string | null;
+  category: NotificationCategory;
+  severity: NotificationSeverity;
+  title: string;
+  body: string | null;
+  action_url: string | null;
+  action_label: string | null;
+  metadata: Record<string, unknown>;
+  read_at: string | null;
+  dismissed_at: string | null;
+  expires_at: string | null;
+  inserted_at: string;
+}
+
+export interface NotificationBadges {
+  unread: number;
+  by_category: Record<string, number>;
+  by_severity: Record<string, number>;
+}
+
+export interface NotificationFilters {
+  category?: NotificationCategory;
+  severity?: NotificationSeverity;
+  unread?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+export type ReportType =
+  | "agent_performance"
+  | "cost_analysis"
+  | "task_summary"
+  | "workflow_audit"
+  | "custom";
+
+export type ReportFormat = "table" | "chart" | "pdf" | "csv";
+export type ReportStatus = "active" | "generating" | "archived";
+
+export interface ReportCachedResult {
+  summary: Record<string, unknown>;
+  columns: string[];
+  rows: (string | number)[][];
+  chart_data?: Array<{ label: string; value: number; secondary?: number }>;
+}
+
+export interface Report {
+  id: string;
+  name: string;
+  description: string | null;
+  report_type: ReportType;
+  config: Record<string, unknown>;
+  schedule: string | null;
+  last_generated_at: string | null;
+  format: ReportFormat;
+  status: ReportStatus;
+  cached_result: ReportCachedResult | null;
+  tags: string[];
+  workspace_id: string | null;
+  created_by_id: string | null;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface ReportCreateRequest {
+  name: string;
+  description?: string;
+  report_type: ReportType;
+  config: Record<string, unknown>;
+  schedule?: string;
+  format?: ReportFormat;
+  tags?: string[];
+}

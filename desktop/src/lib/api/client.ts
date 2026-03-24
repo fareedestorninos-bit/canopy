@@ -2081,6 +2081,140 @@ export const datasets = {
   },
 };
 
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export const notifications = {
+  list: async (
+    filters: import("./types").NotificationFilters = {},
+  ): Promise<import("./types").Notification[]> => {
+    const qs = new URLSearchParams();
+    if (filters.category) qs.set("category", filters.category);
+    if (filters.severity) qs.set("severity", filters.severity);
+    if (filters.unread !== undefined) qs.set("unread", String(filters.unread));
+    if (filters.limit !== undefined) qs.set("limit", String(filters.limit));
+    if (filters.offset !== undefined) qs.set("offset", String(filters.offset));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    const data = await request<{
+      notifications: import("./types").Notification[];
+      total: number;
+    }>(`/notifications${query}`);
+    return data.notifications ?? [];
+  },
+
+  get: async (id: string): Promise<import("./types").Notification> => {
+    const data = await request<{
+      notification: import("./types").Notification;
+    }>(`/notifications/${id}`);
+    return (
+      data.notification ?? (data as unknown as import("./types").Notification)
+    );
+  },
+
+  markRead: async (id: string): Promise<import("./types").Notification> => {
+    const data = await request<{
+      notification: import("./types").Notification;
+    }>(`/notifications/${id}/read`, { method: "POST" });
+    return (
+      data.notification ?? (data as unknown as import("./types").Notification)
+    );
+  },
+
+  markAllRead: async (
+    category?: import("./types").NotificationCategory,
+  ): Promise<void> => {
+    const body = category ? JSON.stringify({ category }) : undefined;
+    await request<{ ok: boolean }>("/notifications/mark-all-read", {
+      method: "POST",
+      body,
+    });
+  },
+
+  dismiss: async (id: string): Promise<import("./types").Notification> => {
+    const data = await request<{
+      notification: import("./types").Notification;
+    }>(`/notifications/${id}/dismiss`, { method: "POST" });
+    return (
+      data.notification ?? (data as unknown as import("./types").Notification)
+    );
+  },
+
+  badges: async (): Promise<import("./types").NotificationBadges> => {
+    return request<import("./types").NotificationBadges>(
+      "/notifications/badges",
+    );
+  },
+
+  create: async (
+    body: Partial<import("./types").Notification>,
+  ): Promise<import("./types").Notification> => {
+    const data = await request<{
+      notification: import("./types").Notification;
+    }>("/notifications", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return (
+      data.notification ?? (data as unknown as import("./types").Notification)
+    );
+  },
+};
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+export const reports = {
+  list: async (params?: {
+    report_type?: import("./types").ReportType;
+  }): Promise<import("./types").Report[]> => {
+    const qs = params?.report_type ? `?report_type=${params.report_type}` : "";
+    const data = await request<{
+      reports: import("./types").Report[];
+      count: number;
+    }>(`/reports${qs}`);
+    return data.reports ?? [];
+  },
+
+  get: async (id: string): Promise<import("./types").Report> => {
+    const data = await request<{ report: import("./types").Report }>(
+      `/reports/${id}`,
+    );
+    return data.report;
+  },
+
+  create: async (
+    body: import("./types").ReportCreateRequest,
+  ): Promise<import("./types").Report> => {
+    const data = await request<{ report: import("./types").Report }>(
+      "/reports",
+      { method: "POST", body: JSON.stringify(body) },
+    );
+    return data.report;
+  },
+
+  update: async (
+    id: string,
+    body: Partial<import("./types").ReportCreateRequest>,
+  ): Promise<import("./types").Report> => {
+    const data = await request<{ report: import("./types").Report }>(
+      `/reports/${id}`,
+      { method: "PATCH", body: JSON.stringify(body) },
+    );
+    return data.report;
+  },
+
+  remove: (id: string) => request<void>(`/reports/${id}`, { method: "DELETE" }),
+
+  generate: async (id: string): Promise<import("./types").Report> => {
+    const data = await request<{
+      report: import("./types").Report;
+      generated: boolean;
+    }>(`/reports/${id}/generate`, { method: "POST" });
+    return data.report;
+  },
+
+  exportReport: (id: string, format = "csv") =>
+    request<Blob>(`/reports/${id}/export?format=${format}`),
+};
+
 // ── Enable/Disable Mock ──────────────────────────────────────────────────────
 // These are async because disabling mock purges localStorage and notifies the
 // mock module, both of which are best-effort async operations.

@@ -211,6 +211,16 @@ defmodule CanopyWeb.Router do
     get "/templates", TemplateController, :index
     post "/templates", TemplateController, :create
 
+    # Library / Marketplace
+    get "/library/installed", LibraryController, :installed
+    get "/library/categories", LibraryController, :categories
+
+    resources "/library", LibraryController, except: [:new, :edit] do
+      post "/install", LibraryController, :install, as: :install
+      post "/uninstall", LibraryController, :uninstall, as: :uninstall
+      post "/rate", LibraryController, :rate, as: :rate
+    end
+
     # Secrets
     resources "/secrets", SecretController, except: [:new, :edit] do
       post "/rotate", SecretController, :rotate, as: :rotate
@@ -311,6 +321,12 @@ defmodule CanopyWeb.Router do
       post "/refresh", DatasetController, :refresh, as: :refresh
       post "/grant", DatasetController, :grant_access, as: :grant
       post "/revoke", DatasetController, :revoke_access, as: :revoke
+    end
+
+    # Reports
+    resources "/reports", ReportController, except: [:new, :edit] do
+      post "/generate", ReportController, :generate, as: :generate
+      get "/export", ReportController, :export, as: :export
     end
   end
 

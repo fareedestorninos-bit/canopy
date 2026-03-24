@@ -7,15 +7,16 @@
   import InboxFeed from '$lib/components/inbox/InboxFeed.svelte';
   import { inboxStore } from '$lib/stores/inbox.svelte';
   import { approvalsStore } from '$lib/stores/approvals.svelte';
+  import { notificationsStore } from '$lib/stores/notifications.svelte';
   import { workspaceStore } from '$lib/stores/workspace.svelte';
-  import type { ApprovalStatus } from '$api/types';
+  import type { ApprovalStatus, NotificationCategory } from '$api/types';
 
   // ── Tab state — driven by ?tab= query param ──────────────────────────────
-  type InboxTab = 'all' | 'messages' | 'approvals';
+  type InboxTab = 'all' | 'messages' | 'approvals' | 'notifications';
 
   let activeTab = $derived.by<InboxTab>(() => {
     const t = $page.url.searchParams.get('tab');
-    if (t === 'messages' || t === 'approvals') return t;
+    if (t === 'messages' || t === 'approvals' || t === 'notifications') return t;
     return 'all';
   });
 
@@ -29,17 +30,21 @@
     void goto(url.toString(), { replaceState: true, keepFocus: true });
   }
 
-  // ── Fetch both stores on mount / workspace change ────────────────────────
+  // ── Fetch all stores on mount / workspace change ─────────────────────────
   $effect(() => {
     void workspaceStore.activeWorkspaceId;
     void inboxStore.fetchItems();
     void approvalsStore.fetchApprovals();
+    void notificationsStore.fetchNotifications();
+    void notificationsStore.fetchBadges();
+    notificationsStore.startPolling();
+    return () => notificationsStore.stopPolling();
   });
 
   // ── Combined badge ───────────────────────────────────────────────────────
   let totalBadge = $derived(
-    inboxStore.unreadCount + approvalsStore.pendingCount > 0
-      ? inboxStore.unreadCount + approvalsStore.pendingCount
+    inboxStore.unreadCount + approvalsStore.pendingCount + notificationsStore.unreadCount > 0
+      ? inboxStore.unreadCount + approvalsStore.pendingCount + notificationsStore.unreadCount
       : undefined,
   );
 
@@ -84,11 +89,42 @@
     }
   }
 
+  // ── Notification helpers ─────────────────────────────────────────────────
+  function formatRelativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    if (diff < 60_000) return 'just now';
+    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+    return `${Math.floor(diff / 86_400_000)}d ago`;
+  }
+
+  const CATEGORY_LABELS: Record<NotificationCategory, string> = {
+    task:     'Task',
+    approval: 'Approval',
+    alert:    'Alert',
+    mention:  'Mention',
+    system:   'System',
+    budget:   'Budget',
+    workflow: 'Workflow',
+  };
+
+  // ntf = active (not dismissed) notifications, sorted by recency
+  let ntfVisible = $derived(
+    notificationsStore.notifications
+      .filter((n) => !n.dismissed_at)
+      .sort((a, b) => {
+        const unreadDiff = (a.read_at ? 1 : 0) - (b.read_at ? 1 : 0);
+        if (unreadDiff !== 0) return unreadDiff;
+        return new Date(b.inserted_at).getTime() - new Date(a.inserted_at).getTime();
+      }),
+  );
+
   // ── Tab definitions ──────────────────────────────────────────────────────
   const TABS: { id: InboxTab; label: string }[] = [
-    { id: 'all',       label: 'All' },
-    { id: 'messages',  label: 'Messages' },
-    { id: 'approvals', label: 'Approvals' },
+    { id: 'all',           label: 'All' },
+    { id: 'messages',      label: 'Messages' },
+    { id: 'approvals',     label: 'Approvals' },
+    { id: 'notifications', label: 'Notifications' },
   ];
 </script>
 
@@ -111,6 +147,14 @@
           {:else if tab.id === 'approvals' && approvalsStore.pendingCount > 0}
             <span class="ib-tab-badge ib-tab-badge--approval" aria-label="{approvalsStore.pendingCount} pending">
               {approvalsStore.pendingCount}
+            </span>
+          {:else if tab.id === 'notifications' && notificationsStore.unreadCount > 0}
+            <span
+              class="ib-tab-badge"
+              class:ib-tab-badge--critical={notificationsStore.criticalCount > 0}
+              aria-label="{notificationsStore.unreadCount} unread notifications"
+            >
+              {notificationsStore.unreadCount}
             </span>
           {/if}
         </button>
@@ -220,6 +264,110 @@
                   </div>
                 </div>
               {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+
+    <!-- ── Notifications view ─────────────────────────────────────────── -->
+    {:else if activeTab === 'notifications'}
+      {#if notificationsStore.loading && notificationsStore.notifications.length === 0}
+        <div class="ib-approval-state" role="status" aria-live="polite">
+          <div class="ib-approval-spinner" aria-hidden="true"></div>
+          <span>Loading notifications…</span>
+        </div>
+      {:else if notificationsStore.error && notificationsStore.notifications.length === 0}
+        <div class="ib-approval-state ib-approval-state--error" role="alert">
+          <p>Failed to load notifications: {notificationsStore.error}</p>
+          <button
+            class="ib-approval-retry"
+            onclick={() => void notificationsStore.fetchNotifications()}
+          >
+            Retry
+          </button>
+        </div>
+      {:else if ntfVisible.length === 0}
+        <div class="ib-approval-state" role="status">
+          <p class="ib-approval-empty">No notifications.</p>
+        </div>
+      {:else}
+        <div class="ntf-toolbar">
+          <span class="ntf-toolbar-count">
+            {ntfVisible.filter((n) => !n.read_at).length} unread
+          </span>
+          {#if ntfVisible.some((n) => !n.read_at)}
+            <button
+              class="ntf-toolbar-btn"
+              type="button"
+              onclick={() => void notificationsStore.markAllRead()}
+            >
+              Mark all read
+            </button>
+          {/if}
+        </div>
+
+        <ul class="ntf-list" aria-label="Notifications">
+          {#each ntfVisible as ntf (ntf.id)}
+            <li
+              class="ntf-item"
+              class:ntf-item--unread={!ntf.read_at}
+              class:ntf-item--critical={ntf.severity === 'critical'}
+            >
+              <!-- Severity dot + category badge row -->
+              <div class="ntf-meta-row">
+                <span
+                  class="ntf-severity-dot"
+                  class:ntf-severity-dot--info={ntf.severity === 'info'}
+                  class:ntf-severity-dot--warning={ntf.severity === 'warning'}
+                  class:ntf-severity-dot--error={ntf.severity === 'error'}
+                  class:ntf-severity-dot--critical={ntf.severity === 'critical'}
+                  aria-label="Severity: {ntf.severity}"
+                  title={ntf.severity}
+                ></span>
+                <span class="ntf-category-badge ntf-category-badge--{ntf.category}">
+                  {CATEGORY_LABELS[ntf.category]}
+                </span>
+                <time class="ntf-time" datetime={ntf.inserted_at} title={ntf.inserted_at}>
+                  {formatRelativeTime(ntf.inserted_at)}
+                </time>
+              </div>
+
+              <!-- Title + body -->
+              <h3 class="ntf-title">{ntf.title}</h3>
+              {#if ntf.body}
+                <p class="ntf-body">{ntf.body}</p>
+              {/if}
+
+              <!-- Action row -->
+              <div class="ntf-actions">
+                {#if ntf.action_url && ntf.action_label}
+                  <a
+                    class="ntf-action-link"
+                    href={ntf.action_url}
+                    aria-label="{ntf.action_label} — {ntf.title}"
+                  >
+                    {ntf.action_label}
+                  </a>
+                {/if}
+                {#if !ntf.read_at}
+                  <button
+                    class="ntf-btn ntf-btn--read"
+                    type="button"
+                    onclick={() => void notificationsStore.markRead(ntf.id)}
+                    aria-label="Mark as read: {ntf.title}"
+                  >
+                    Mark read
+                  </button>
+                {/if}
+                <button
+                  class="ntf-btn ntf-btn--dismiss"
+                  type="button"
+                  onclick={() => void notificationsStore.dismiss(ntf.id)}
+                  aria-label="Dismiss: {ntf.title}"
+                >
+                  Dismiss
+                </button>
+              </div>
             </li>
           {/each}
         </ul>
@@ -596,5 +744,200 @@
 
   .ib-approval-btn--reject:hover:not(:disabled) {
     background: rgba(239, 68, 68, 0.22);
+  }
+
+  /* ── Notification tab badge variant ─────────────────────────────────────── */
+  .ib-tab-badge--critical {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+  }
+
+  /* ── Notification toolbar ────────────────────────────────────────────────── */
+  .ntf-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0 10px;
+    flex-shrink: 0;
+  }
+
+  .ntf-toolbar-count {
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  .ntf-toolbar-btn {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: background 100ms ease, color 100ms ease;
+  }
+
+  .ntf-toolbar-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
+
+  /* ── Notification list ───────────────────────────────────────────────────── */
+  .ntf-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  /* ── Notification item ───────────────────────────────────────────────────── */
+  .ntf-item {
+    padding: 14px 16px;
+    border-radius: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color 120ms ease;
+  }
+
+  .ntf-item:hover { border-color: var(--border-hover); }
+
+  .ntf-item--unread {
+    border-left: 3px solid var(--border-focus, rgba(99, 102, 241, 0.5));
+    padding-left: 13px;
+  }
+
+  .ntf-item--critical.ntf-item--unread {
+    border-left-color: rgba(168, 85, 247, 0.6);
+  }
+
+  /* ── Meta row: dot + category + time ───────────────────────────────────── */
+  .ntf-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .ntf-severity-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-muted);
+  }
+
+  .ntf-severity-dot--info    { background: #60a5fa; }
+  .ntf-severity-dot--warning { background: #fbbf24; }
+  .ntf-severity-dot--error   { background: #f87171; }
+  .ntf-severity-dot--critical{ background: #c084fc; }
+
+  .ntf-category-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--bg-elevated);
+    color: var(--text-tertiary);
+    border: 1px solid var(--border-default);
+  }
+
+  .ntf-category-badge--alert    { background: rgba(239, 68, 68, 0.08);   color: #f87171;  border-color: rgba(239, 68, 68, 0.2); }
+  .ntf-category-badge--budget   { background: rgba(245, 158, 11, 0.08);  color: #fbbf24;  border-color: rgba(245, 158, 11, 0.2); }
+  .ntf-category-badge--approval { background: rgba(245, 158, 11, 0.08);  color: #fbbf24;  border-color: rgba(245, 158, 11, 0.2); }
+  .ntf-category-badge--workflow { background: rgba(99, 102, 241, 0.08);  color: #818cf8;  border-color: rgba(99, 102, 241, 0.2); }
+  .ntf-category-badge--task     { background: rgba(34, 197, 94, 0.08);   color: #4ade80;  border-color: rgba(34, 197, 94, 0.2); }
+  .ntf-category-badge--mention  { background: rgba(56, 189, 248, 0.08);  color: #38bdf8;  border-color: rgba(56, 189, 248, 0.2); }
+  .ntf-category-badge--system   { background: var(--bg-elevated);        color: var(--text-tertiary); }
+
+  .ntf-time {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  /* ── Notification content ────────────────────────────────────────────────── */
+  .ntf-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.35;
+  }
+
+  .ntf-body {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ── Notification actions ────────────────────────────────────────────────── */
+  .ntf-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-top: 2px;
+    flex-wrap: wrap;
+  }
+
+  .ntf-action-link {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent-primary, #6366f1);
+    text-decoration: none;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 4px;
+    padding: 2px 8px;
+    transition: background 100ms ease;
+  }
+
+  .ntf-action-link:hover {
+    background: rgba(99, 102, 241, 0.08);
+  }
+
+  .ntf-btn {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 100ms ease, color 100ms ease;
+  }
+
+  .ntf-btn--read {
+    background: transparent;
+    color: var(--text-tertiary);
+    border: 1px solid var(--border-default);
+  }
+
+  .ntf-btn--read:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+  }
+
+  .ntf-btn--dismiss {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+  }
+
+  .ntf-btn--dismiss:hover {
+    background: var(--bg-elevated);
+    color: var(--text-tertiary);
+    border-color: var(--border-default);
   }
 </style>

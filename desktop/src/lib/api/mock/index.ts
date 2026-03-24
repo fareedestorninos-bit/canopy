@@ -120,6 +120,22 @@ import {
   deleteMockDataset,
   mockDatasetPreview,
 } from "./datasets";
+import {
+  mockReports,
+  mockReportById,
+  addMockReport,
+  updateMockReport,
+  deleteMockReport,
+  generateMockReport,
+} from "./reports";
+import {
+  getMockNotifications,
+  getMockNotificationById,
+  markNotificationRead,
+  markAllNotificationsRead,
+  dismissNotification,
+  getMockNotificationBadges,
+} from "./notifications";
 import type {
   CanopyAgent,
   Schedule,
@@ -1103,6 +1119,121 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
 
   // ── Activity ──────────────────────────────────────────────────────────────────
   { pattern: /^\/activity/, handler: () => ({ events: mockActivity() }) },
+
+  // ── Notifications ─────────────────────────────────────────────────────────────
+  {
+    // GET /notifications/badges  — must come before /:id pattern
+    pattern: /^\/notifications\/badges$/,
+    handler: () => getMockNotificationBadges(),
+  },
+  {
+    // POST /notifications/mark-all-read
+    pattern: /^\/notifications\/mark-all-read$/,
+    handler: (_path, options) => {
+      let category: string | undefined;
+      if (options.body) {
+        try {
+          const body =
+            typeof options.body === "string"
+              ? JSON.parse(options.body)
+              : options.body;
+          category = (body as { category?: string }).category;
+        } catch {
+          // ignore
+        }
+      }
+      markAllNotificationsRead(category);
+      return { ok: true };
+    },
+  },
+  {
+    // POST /notifications/:id/read
+    pattern: /^\/notifications\/([^/]+)\/read$/,
+    handler: (path) => {
+      const id = path.split("/")[2];
+      const notification = markNotificationRead(id);
+      return { notification: notification ?? { error: "not_found" } };
+    },
+  },
+  {
+    // POST /notifications/:id/dismiss
+    pattern: /^\/notifications\/([^/]+)\/dismiss$/,
+    handler: (path) => {
+      const id = path.split("/")[2];
+      const notification = dismissNotification(id);
+      return { notification: notification ?? { error: "not_found" } };
+    },
+  },
+  {
+    // GET /notifications/:id
+    pattern: /^\/notifications\/([^/]+)$/,
+    handler: (path) => {
+      const id = path.split("/")[2];
+      const notification = getMockNotificationById(id);
+      return { notification: notification ?? { error: "not_found" } };
+    },
+  },
+  {
+    // GET /notifications  (with optional ?category=, ?unread=, ?severity=, ?limit=, ?offset=)
+    // POST /notifications (create)
+    pattern: /^\/notifications$/,
+    handler: (_path, options, rawPath) => {
+      if ((options.method ?? "GET").toUpperCase() === "POST") {
+        // Create — just echo back a fake notification
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const now = new Date().toISOString();
+        return {
+          notification: {
+            id: `ntf-new-${Date.now()}`,
+            workspace_id: "ws-1",
+            recipient_type: "user",
+            recipient_id: null,
+            sender_type: "system",
+            sender_id: null,
+            category: (body.category as string) ?? "system",
+            severity: (body.severity as string) ?? "info",
+            title: (body.title as string) ?? "New notification",
+            body: (body.body as string) ?? null,
+            action_url: null,
+            action_label: null,
+            metadata: {},
+            read_at: null,
+            dismissed_at: null,
+            expires_at: null,
+            inserted_at: now,
+          },
+        };
+      }
+
+      // GET with filters
+      const params = new URLSearchParams((rawPath ?? "").split("?")[1] ?? "");
+      const category = params.get("category");
+      const severity = params.get("severity");
+      const unread = params.get("unread");
+      const limit = params.get("limit")
+        ? parseInt(params.get("limit")!, 10)
+        : undefined;
+      const offset = params.get("offset")
+        ? parseInt(params.get("offset")!, 10)
+        : 0;
+
+      let results = getMockNotifications().filter((n) => !n.dismissed_at);
+      if (category) results = results.filter((n) => n.category === category);
+      if (severity) results = results.filter((n) => n.severity === severity);
+      if (unread === "true") results = results.filter((n) => !n.read_at);
+
+      const total = results.length;
+      if (offset) results = results.slice(offset);
+      if (limit !== undefined) results = results.slice(0, limit);
+
+      return { notifications: results, total };
+    },
+  },
 
   // ── Inbox ─────────────────────────────────────────────────────────────────────
   {
@@ -2227,6 +2358,121 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
 
       const datasets = mockDatasets(wsId, sourceType);
       return { datasets, count: datasets.length };
+    },
+  },
+
+  // ── Reports ───────────────────────────────────────────────────────────────────
+  {
+    // POST /reports/:id/generate
+    pattern: /^\/reports\/([^/]+)\/generate$/,
+    handler: (path) => {
+      const id = path.split("/")[2];
+      const report = generateMockReport(id);
+      if (!report) return { error: "not_found" };
+      return { report, generated: true };
+    },
+  },
+  {
+    // GET /reports/:id/export
+    pattern: /^\/reports\/([^/]+)\/export$/,
+    handler: (path, _options, rawPath) => {
+      const id = path.split("/")[2];
+      const report = mockReportById(id);
+      if (!report) return { error: "not_found" };
+      const format =
+        new URL("http://x" + rawPath).searchParams.get("format") ?? "csv";
+      const result = report.cached_result;
+      if (format === "csv" && result) {
+        const header = result.columns.join(",");
+        const body = result.rows
+          .map((row) =>
+            row
+              .map((v) => String(v))
+              .map((v) =>
+                v.includes(",") || v.includes('"')
+                  ? `"${v.replace(/"/g, '""')}"`
+                  : v,
+              )
+              .join(","),
+          )
+          .join("\n");
+        return `${header}\n${body}\n`;
+      }
+      return { report, data: result, format };
+    },
+  },
+  {
+    // GET/PATCH/DELETE /reports/:id
+    pattern: /^\/reports\/([^/]+)$/,
+    handler: (path, options) => {
+      const id = path.split("/")[2];
+      const method = (options.method ?? "GET").toUpperCase();
+      if (method === "DELETE") {
+        deleteMockReport(id);
+        return undefined;
+      }
+      if ((method === "PATCH" || method === "PUT") && options.body) {
+        try {
+          const body = JSON.parse(
+            typeof options.body === "string"
+              ? options.body
+              : JSON.stringify(options.body),
+          ) as Partial<import("../types").Report>;
+          const updated = updateMockReport(id, body);
+          return updated ? { report: updated } : { error: "not_found" };
+        } catch {
+          const r = mockReportById(id);
+          return r ? { report: r } : { error: "not_found" };
+        }
+      }
+      const r = mockReportById(id);
+      return r ? { report: r } : { error: "not_found" };
+    },
+  },
+  {
+    // GET /reports  |  POST /reports
+    pattern: /^\/reports$/,
+    handler: (_path, options, rawPath) => {
+      const method = (options.method ?? "GET").toUpperCase();
+      if (method === "POST") {
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const now = new Date().toISOString();
+        const newReport: import("../types").Report = {
+          id: `rpt-${Date.now()}`,
+          name: (body.name as string) ?? "New Report",
+          description: (body.description as string) ?? null,
+          report_type:
+            (body.report_type as import("../types").ReportType) ??
+            "agent_performance",
+          config: (body.config as Record<string, unknown>) ?? {},
+          schedule: (body.schedule as string) ?? null,
+          last_generated_at: null,
+          format: (body.format as import("../types").ReportFormat) ?? "table",
+          status: "active",
+          cached_result: null,
+          tags: (body.tags as string[]) ?? [],
+          workspace_id: null,
+          created_by_id: null,
+          inserted_at: now,
+          updated_at: now,
+        };
+        addMockReport(newReport);
+        return { report: newReport };
+      }
+      // GET with optional report_type filter
+      const reportType = new URL("http://x" + rawPath).searchParams.get(
+        "report_type",
+      );
+      const all = mockReports();
+      const filtered = reportType
+        ? all.filter((r) => r.report_type === reportType)
+        : all;
+      return { reports: filtered, count: filtered.length };
     },
   },
 ];
