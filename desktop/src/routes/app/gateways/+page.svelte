@@ -87,22 +87,22 @@
                 <span class="gw-primary">Primary</span>
               {/if}
             </div>
-            <span class="gw-status gw-status--{gw.status}">{gw.status}</span>
+            <span class="gw-status gw-status--{gw.status ?? 'unknown'}">{gw.status ?? '—'}</span>
           </div>
           <div class="gw-meta">
-            <span class="gw-provider">{gw.provider}</span>
-            <span class="gw-endpoint">{gw.endpoint}</span>
+            <span class="gw-provider">{gw.provider ?? '—'}</span>
+            <span class="gw-endpoint">{gw.endpoint ?? '—'}</span>
           </div>
-          {#if gw.latency_ms !== null}
+          {#if gw.latency_ms != null}
             <div class="gw-latency">{gw.latency_ms}ms latency</div>
           {/if}
-          {#if gw.models.length > 0}
+          {#if (gw.models ?? []).length > 0}
             <div class="gw-models">
-              {#each gw.models.slice(0, 4) as model}
+              {#each (gw.models ?? []).slice(0, 4) as model}
                 <span class="gw-model">{model}</span>
               {/each}
-              {#if gw.models.length > 4}
-                <span class="gw-model-more">+{gw.models.length - 4} more</span>
+              {#if (gw.models ?? []).length > 4}
+                <span class="gw-model-more">+{(gw.models ?? []).length - 4} more</span>
               {/if}
             </div>
           {/if}

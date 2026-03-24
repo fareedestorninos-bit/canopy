@@ -137,7 +137,7 @@ defmodule CanopyWeb.GoalController do
               end
 
             {:error, reason} ->
-              Logger.warning("[GoalDecomposer] Async decompose failed for #{goal_id}: #{inspect(reason)}")
+              Logger.warning("[GoalDecomposer] Async decompose failed for #{goal_id}: #{to_string(reason)}")
           end
         end)
 

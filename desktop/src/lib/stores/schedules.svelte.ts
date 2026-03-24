@@ -98,6 +98,14 @@ class SchedulesStore {
     this.loading = true;
     try {
       this.schedules = await schedulesApi.list(workspaceId);
+      // Refresh selected from the new array so stale references don't keep
+      // detail panels rendered after the underlying data changes.
+      if (this.selected) {
+        const refreshed = this.schedules.find(
+          (s) => s.id === this.selected!.id,
+        );
+        this.selected = refreshed ?? null;
+      }
       this.error = null;
     } catch (e) {
       const msg = (e as Error).message;

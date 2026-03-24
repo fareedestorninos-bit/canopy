@@ -154,7 +154,20 @@ class LogsStore {
 
   startStreaming(): void {
     if (this.#sseController) return;
-    this.#sseController = connectSSE("/logs/stream", {
+    // Append current filter params so the backend only sends matching events
+    const params = new URLSearchParams();
+    if (this.filterLevels.size > 0) {
+      params.set("levels", Array.from(this.filterLevels).join(","));
+    }
+    if (this.filterSource !== "all") {
+      params.set("source", this.filterSource);
+    }
+    if (this.filterAgent !== "all") {
+      params.set("agent", this.filterAgent);
+    }
+    const query = params.toString();
+    const path = `/logs/stream${query ? `?${query}` : ""}`;
+    this.#sseController = connectSSE(path, {
       onConnect: () => {
         this.connected = true;
         this.error = null;

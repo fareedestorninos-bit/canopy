@@ -11,31 +11,54 @@
     void alertsStore.fetchRules();
   });
 
+  const ENTITY_OPTIONS: { value: AlertRule['entity_type']; label: string }[] = [
+    { value: 'agent',    label: 'Agent'    },
+    { value: 'system',   label: 'System'   },
+    { value: 'schedule', label: 'Schedule' },
+    { value: 'budget',   label: 'Cost'     },
+  ];
+
+  const OPERATOR_OPTIONS: { value: AlertRule['operator']; label: string }[] = [
+    { value: 'gt',       label: '>'        },
+    { value: 'lt',       label: '<'        },
+    { value: 'gte',      label: '>='       },
+    { value: 'lte',      label: '<='       },
+    { value: 'eq',       label: '=='       },
+    { value: 'neq',      label: '!='       },
+    { value: 'contains', label: 'contains' },
+  ];
+
+  const ACTION_OPTIONS: { value: AlertRule['action']; label: string }[] = [
+    { value: 'notify',      label: 'Notify'    },
+    { value: 'pause_agent', label: 'Pause'     },
+    { value: 'webhook',     label: 'Webhook'   },
+    { value: 'email',       label: 'Email'     },
+  ];
+
   // Create form state
   let showForm = $state(false);
   let formName = $state('');
   let formEntity = $state<AlertRule['entity_type']>('agent');
-  let formCondition = $state('');
-  let formSeverity = $state<'info' | 'warning' | 'critical'>('warning');
+  let formField = $state('');
+  let formOperator = $state<AlertRule['operator']>('gt');
+  let formThreshold = $state('');
+  let formAction = $state<AlertRule['action']>('notify');
+  let formEnabled = $state(true);
   let creating = $state(false);
   let formError = $state<string | null>(null);
 
   async function handleCreate() {
-    if (!formName.trim() || !formCondition.trim()) return;
+    if (!formName.trim() || !formField.trim() || !formThreshold.trim()) return;
     creating = true;
     formError = null;
-    // Map severity to an action; the condition field maps to a human-readable
-    // value that the backend will parse into field/operator/value.
     const created = await alertsStore.createRule({
       name: formName.trim(),
       entity_type: formEntity,
-      // Store condition string as the `value` field for display purposes.
-      // The backend is responsible for parsing it.
-      field: 'condition',
-      operator: 'contains',
-      value: formCondition.trim(),
-      action: formSeverity === 'critical' ? 'pause_agent' : 'notify',
-      enabled: true,
+      field: formField.trim(),
+      operator: formOperator,
+      value: formThreshold.trim(),
+      action: formAction,
+      enabled: formEnabled,
     });
     creating = false;
     if (created) {
@@ -49,8 +72,11 @@
     showForm = false;
     formName = '';
     formEntity = 'agent';
-    formCondition = '';
-    formSeverity = 'warning';
+    formField = '';
+    formOperator = 'gt';
+    formThreshold = '';
+    formAction = 'notify';
+    formEnabled = true;
     formError = null;
   }
 </script>
@@ -132,32 +158,58 @@
       <div class="al-field">
         <label class="al-label" for="al-entity-input">Entity</label>
         <select id="al-entity-input" class="al-select" bind:value={formEntity}>
-          <option value="agent">Agent</option>
-          <option value="budget">Budget</option>
-          <option value="schedule">Schedule</option>
-          <option value="system">System</option>
+          {#each ENTITY_OPTIONS as opt (opt.value)}
+            <option value={opt.value}>{opt.label}</option>
+          {/each}
         </select>
       </div>
 
       <div class="al-field">
-        <label class="al-label" for="al-condition-input">Condition</label>
+        <label class="al-label" for="al-field-input">Field</label>
         <input
-          id="al-condition-input"
+          id="al-field-input"
           class="al-input"
           type="text"
-          placeholder="e.g. error_rate > 0.1"
-          bind:value={formCondition}
+          placeholder="e.g. error_rate"
+          bind:value={formField}
         />
       </div>
 
+      <div class="al-row">
+        <div class="al-field">
+          <label class="al-label" for="al-operator-input">Operator</label>
+          <select id="al-operator-input" class="al-select" bind:value={formOperator}>
+            {#each OPERATOR_OPTIONS as opt (opt.value)}
+              <option value={opt.value}>{opt.label}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="al-field">
+          <label class="al-label" for="al-threshold-input">Threshold</label>
+          <input
+            id="al-threshold-input"
+            class="al-input"
+            type="text"
+            placeholder="e.g. 0.1"
+            bind:value={formThreshold}
+          />
+        </div>
+      </div>
+
       <div class="al-field">
-        <label class="al-label" for="al-severity-input">Severity</label>
-        <select id="al-severity-input" class="al-select" bind:value={formSeverity}>
-          <option value="info">Info</option>
-          <option value="warning">Warning</option>
-          <option value="critical">Critical</option>
+        <label class="al-label" for="al-action-input">Action</label>
+        <select id="al-action-input" class="al-select" bind:value={formAction}>
+          {#each ACTION_OPTIONS as opt (opt.value)}
+            <option value={opt.value}>{opt.label}</option>
+          {/each}
         </select>
       </div>
+
+      <label class="al-checkbox-label">
+        <input type="checkbox" bind:checked={formEnabled} />
+        <span>Enabled</span>
+      </label>
 
       {#if formError}
         <p class="al-form-error" role="alert">{formError}</p>
@@ -168,7 +220,7 @@
         <button
           class="al-btn-primary"
           onclick={handleCreate}
-          disabled={creating || !formName.trim() || !formCondition.trim()}
+          disabled={creating || !formName.trim() || !formField.trim() || !formThreshold.trim()}
         >
           {creating ? 'Creating…' : 'Create Rule'}
         </button>
@@ -229,6 +281,12 @@
     width: 100%; box-sizing: border-box;
   }
   .al-input:focus, .al-select:focus { outline: none; border-color: #6366f1; }
+  .al-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .al-checkbox-label {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dt);
+    cursor: pointer;
+  }
+  .al-checkbox-label input[type="checkbox"] { accent-color: #6366f1; }
   .al-form-error { font-size: 12px; color: #fca5a5; margin: 0; }
   .al-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
   .al-btn-ghost, .al-btn-primary {

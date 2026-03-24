@@ -70,6 +70,13 @@ defmodule Canopy.Heartbeat do
         agent_name: agent.name
       })
 
+      CanopyWeb.Endpoint.broadcast("activity:global", "new_event", %{
+        event: "run.started",
+        agent_id: agent.id,
+        session_id: session.id,
+        timestamp: DateTime.utc_now()
+      })
+
       persist_activity_event(agent, "run.started", "Agent #{agent.name} started a heartbeat run", %{session_id: session.id})
 
       if issue_id do
@@ -130,6 +137,14 @@ defmodule Canopy.Heartbeat do
             end
 
             broadcast_workspace(agent, %{event: "run.failed", agent_id: agent.id, session_id: session.id, error: Exception.message(e)})
+
+            CanopyWeb.Endpoint.broadcast("activity:global", "new_event", %{
+              event: "run.failed",
+              agent_id: agent.id,
+              session_id: session.id,
+              timestamp: DateTime.utc_now()
+            })
+
             persist_activity_event(agent, "run.failed", "Agent #{agent.name} run failed: #{Exception.message(e)}", %{session_id: session.id})
             raise e
         end
@@ -186,6 +201,13 @@ defmodule Canopy.Heartbeat do
         session_id: session.id,
         agent_name: agent.name,
         cost_cents: totals.cost
+      })
+
+      CanopyWeb.Endpoint.broadcast("activity:global", "new_event", %{
+        event: "run.completed",
+        agent_id: agent.id,
+        session_id: session.id,
+        timestamp: DateTime.utc_now()
       })
 
       persist_activity_event(agent, "run.completed", "Agent #{agent.name} completed run (cost: #{totals.cost}\u00A2)", %{session_id: session.id, cost_cents: totals.cost})

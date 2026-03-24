@@ -6,6 +6,7 @@ import { toastStore } from "./toasts.svelte";
 interface SpawnCreateRequest {
   agent_id: string;
   task: string;
+  context?: string;
   model?: string;
 }
 
@@ -38,10 +39,19 @@ class SpawnStore {
     this.instances.reduce((sum, i) => sum + (i.cost_cents ?? 0), 0),
   );
 
+  // Backend uses `context`; frontend uses `task`.
+  #normalizeInstances(items: SpawnInstance[]): SpawnInstance[] {
+    return items.map((i) => {
+      const raw = i as unknown as Record<string, unknown>;
+      return { ...i, task: (raw.context as string) ?? i.task };
+    });
+  }
+
   async fetchInstances(): Promise<void> {
     this.loading = true;
     try {
-      this.instances = await spawnApi.list();
+      const raw = await spawnApi.list();
+      this.instances = this.#normalizeInstances(raw);
       this.error = null;
     } catch (e) {
       const msg = (e as Error).message;
@@ -55,8 +65,18 @@ class SpawnStore {
   async createSpawn(data: SpawnCreateRequest): Promise<SpawnInstance | null> {
     this.loading = true;
     try {
-      const created = await spawnApi.create(data);
-      this.instances = [created, ...this.instances];
+      // Send `context` for the backend; keep `task` for frontend compat
+      const payload = {
+        agent_id: data.agent_id,
+        context: data.task,
+        model: data.model,
+      };
+      const created = await spawnApi.create(
+        payload as unknown as Parameters<typeof spawnApi.create>[0],
+      );
+      // Normalize response: backend may return `context` instead of `task`
+      const normalized = this.#normalizeInstances([created])[0];
+      this.instances = [normalized, ...this.instances];
       this.error = null;
       toastStore.success(
         "Spawn started",
@@ -84,7 +104,7 @@ class SpawnStore {
   async refreshActive(): Promise<void> {
     if (this.activeInstances.length === 0) return;
     try {
-      const fresh = await spawnApi.list();
+      const fresh = this.#normalizeInstances(await spawnApi.list());
       // Merge fresh data — preserve ordering of existing instances
       const freshMap = new Map(fresh.map((i) => [i.id, i]));
       const merged = this.instances.map((i) => freshMap.get(i.id) ?? i);

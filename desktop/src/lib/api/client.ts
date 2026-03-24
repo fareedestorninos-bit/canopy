@@ -3,6 +3,7 @@
 
 import type {
   CanopyAgent,
+  AgentStatus,
   AgentCreateRequest,
   DashboardData,
   HealthResponse,
@@ -817,29 +818,65 @@ export const dashboard = {
 
 // ── Agents ────────────────────────────────────────────────────────────────────
 
+/** Map backend agent statuses to frontend equivalents */
+function mapAgentStatus(status: string): AgentStatus {
+  switch (status) {
+    case "active":
+      return "idle";
+    case "working":
+      return "running";
+    default:
+      return status as AgentStatus;
+  }
+}
+
+function mapAgentStatuses(agent: CanopyAgent): CanopyAgent {
+  return { ...agent, status: mapAgentStatus(agent.status) };
+}
+
 export const agents = {
   list: async (workspaceId?: string): Promise<CanopyAgent[]> => {
     const qs = workspaceId ? `?workspace_id=${workspaceId}` : "";
     const data = await request<{ agents: CanopyAgent[]; count: number }>(
       `/agents${qs}`,
     );
-    return data.agents ?? [];
+    return (data.agents ?? []).map(mapAgentStatuses);
   },
-  get: (id: string) => request<CanopyAgent>(`/agents/${id}`),
-  create: (body: AgentCreateRequest) =>
-    request<CanopyAgent>("/agents", {
+  get: async (id: string): Promise<CanopyAgent> => {
+    const agent = await request<CanopyAgent>(`/agents/${id}`);
+    return mapAgentStatuses(agent);
+  },
+  create: async (body: AgentCreateRequest): Promise<CanopyAgent> => {
+    const data = await request<{ agent: CanopyAgent }>("/agents", {
       method: "POST",
       body: JSON.stringify(body),
-    }),
-  update: (id: string, body: Partial<AgentCreateRequest>) =>
-    request<CanopyAgent>(`/agents/${id}`, {
+    });
+    // Backend wraps response in {agent: ...}; mock returns bare agent
+    return mapAgentStatuses(data.agent ?? (data as unknown as CanopyAgent));
+  },
+  update: async (
+    id: string,
+    body: Partial<AgentCreateRequest>,
+  ): Promise<CanopyAgent> => {
+    const data = await request<{ agent: CanopyAgent }>(`/agents/${id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
-    }),
-  action: (id: string, action: string) =>
-    request<CanopyAgent>(`/agents/${id}/${action}`, { method: "POST" }),
-  resume: (id: string) =>
-    request<CanopyAgent>(`/agents/${id}/resume`, { method: "POST" }),
+    });
+    return mapAgentStatuses(data.agent ?? (data as unknown as CanopyAgent));
+  },
+  action: async (id: string, action: string): Promise<CanopyAgent> => {
+    const data = await request<{ agent: CanopyAgent }>(
+      `/agents/${id}/${action}`,
+      { method: "POST" },
+    );
+    return mapAgentStatuses(data.agent ?? (data as unknown as CanopyAgent));
+  },
+  resume: async (id: string): Promise<CanopyAgent> => {
+    const data = await request<{ agent: CanopyAgent }>(`/agents/${id}/resume`, {
+      method: "POST",
+    });
+    return mapAgentStatuses(data.agent ?? (data as unknown as CanopyAgent));
+  },
   terminate: (id: string) =>
     request<void>(`/agents/${id}`, { method: "DELETE" }),
   hierarchy: () => request<{ hierarchy: unknown[] }>("/agents/hierarchy"),

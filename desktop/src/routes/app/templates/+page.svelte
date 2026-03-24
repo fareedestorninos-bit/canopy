@@ -134,21 +134,21 @@
             aria-label="Select template {template.name}"
           >
             <div class="tpl-header">
-              <span class="tpl-name">{template.name}</span>
-              <span class="tpl-adapter">{template.adapter}</span>
+              <span class="tpl-name">{template.name ?? '—'}</span>
+              <span class="tpl-adapter">{template.adapter ?? '—'}</span>
             </div>
-            <p class="tpl-desc">{template.description}</p>
+            <p class="tpl-desc">{template.description ?? '—'}</p>
             <div class="tpl-meta">
-              <span class="tpl-model">{template.model}</span>
-              <span class="tpl-downloads">{template.downloads.toLocaleString()} downloads</span>
+              <span class="tpl-model">{template.model ?? '—'}</span>
+              <span class="tpl-downloads">{(template.downloads ?? 0).toLocaleString()} downloads</span>
             </div>
-            {#if template.skills.length > 0}
+            {#if (template.skills ?? []).length > 0}
               <div class="tpl-skills">
-                {#each template.skills.slice(0, 3) as skill}
+                {#each (template.skills ?? []).slice(0, 3) as skill}
                   <span class="tpl-skill">{skill}</span>
                 {/each}
-                {#if template.skills.length > 3}
-                  <span class="tpl-skill-more">+{template.skills.length - 3}</span>
+                {#if (template.skills ?? []).length > 3}
+                  <span class="tpl-skill-more">+{(template.skills ?? []).length - 3}</span>
                 {/if}
               </div>
             {/if}

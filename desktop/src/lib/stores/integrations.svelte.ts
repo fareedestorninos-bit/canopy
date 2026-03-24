@@ -11,10 +11,9 @@ class IntegrationsStore {
   totalCount = $derived(this.integrations.length);
   connectedCount = $derived(
     this.integrations.filter((i) => {
-      if (i.status === "connected") return true;
-      if ("connected" in i && (i as Record<string, unknown>).connected === true)
-        return true;
-      return false;
+      const raw = i as unknown as Record<string, unknown>;
+      if (raw.connected === true) return true;
+      return i.status === "connected";
     }).length,
   );
 

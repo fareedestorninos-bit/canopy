@@ -13,6 +13,16 @@
   title="Skills"
   subtitle="{skillsStore.enabledCount} of {skillsStore.totalCount} enabled"
 >
+  {#snippet actions()}
+    <input
+      class="sk-search"
+      type="text"
+      placeholder="Search skills…"
+      bind:value={skillsStore.searchQuery}
+      aria-label="Search skills by name"
+    />
+  {/snippet}
+
   {#if skillsStore.loading && skillsStore.skills.length === 0}
     <div class="sk-loading" role="status" aria-live="polite">
       <div class="sk-spinner" aria-hidden="true"></div>
@@ -23,9 +33,9 @@
       <p>Failed to load skills: {skillsStore.error}</p>
       <button onclick={() => void skillsStore.fetchSkills()}>Retry</button>
     </div>
-  {:else if skillsStore.skills.length === 0}
+  {:else if skillsStore.filteredSkills.length === 0}
     <div class="sk-empty" role="status">
-      <p>No skills configured.</p>
+      <p>{skillsStore.searchQuery ? 'No skills match your search.' : 'No skills configured.'}</p>
     </div>
   {:else}
     <div class="sk-list" role="list" aria-label="Skills">
@@ -36,7 +46,7 @@
             <div class="sk-desc">{skill.description}</div>
             <div class="sk-meta">
               <span class="sk-badge sk-badge--{skill.category}">{skill.category}</span>
-              <span class="sk-version">v{skill.version}</span>
+              <span class="sk-version">v{skill.version ?? '1.0'}</span>
             </div>
           </div>
           <button
@@ -90,4 +100,11 @@
   }
   .sk-toggle--on { background: color-mix(in srgb, #6366f1 15%, transparent); border-color: color-mix(in srgb, #6366f1 40%, transparent); color: #a5b4fc; }
   .sk-toggle:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+  .sk-search {
+    height: 28px; padding: 0 10px; border-radius: 6px; font-size: 12px;
+    background: var(--dbg3); border: 1px solid var(--dbd); color: var(--dt);
+    width: 180px; box-sizing: border-box;
+  }
+  .sk-search:focus { outline: none; border-color: #6366f1; }
+  .sk-search::placeholder { color: var(--dt4); }
 </style>

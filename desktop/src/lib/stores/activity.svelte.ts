@@ -84,22 +84,57 @@ class ActivityStore {
           this.connected = false;
         },
         onEvent: (event) => {
-          // Backend sends raw event objects with {event: "event.type", ...metadata}
-          // Convert to ActivityEvent shape for the store
+          // Backend may send either shape:
+          //   1. Raw: {event: "agent.hired", agent_id, message, ...}
+          //   2. Normalized: {type: "system_event", title, detail, ...}
+          // Convert both into our ActivityEvent shape.
           const raw = event as unknown as Record<string, unknown>;
+
+          const meta = (raw.data ?? raw.metadata ?? {}) as Record<
+            string,
+            unknown
+          >;
+
           if (raw.event && typeof raw.event === "string") {
+            // Shape 1: raw backend event
             const activityEvent: ActivityEvent = {
               id: (raw.id as string) || crypto.randomUUID(),
               type: raw.event as ActivityEventType,
               agent_id: (raw.agent_id as string) || null,
               agent_name: (raw.agent_name as string) || null,
-              title: (raw.event as string).replace(/\./g, " "),
-              detail: (raw.message as string) || null,
+              title:
+                (raw.title as string) ||
+                (raw.event as string).replace(/\./g, " "),
+              detail: (raw.detail as string) || (raw.message as string) || null,
               level:
                 (raw.level as "info" | "warning" | "error" | "success") ||
                 "info",
-              metadata: raw,
-              created_at: new Date().toISOString(),
+              metadata: meta,
+              created_at:
+                (raw.created_at as string) ||
+                (raw.timestamp as string) ||
+                new Date().toISOString(),
+            };
+            this.#prependEvent(activityEvent);
+          } else if (raw.type && typeof raw.type === "string") {
+            // Shape 2: already normalized event
+            const activityEvent: ActivityEvent = {
+              id: (raw.id as string) || crypto.randomUUID(),
+              type: raw.type as ActivityEventType,
+              agent_id: (raw.agent_id as string) || null,
+              agent_name: (raw.agent_name as string) || null,
+              title:
+                (raw.title as string) ||
+                (raw.type as string).replace(/_/g, " "),
+              detail: (raw.detail as string) || (raw.message as string) || null,
+              level:
+                (raw.level as "info" | "warning" | "error" | "success") ||
+                "info",
+              metadata: meta,
+              created_at:
+                (raw.created_at as string) ||
+                (raw.timestamp as string) ||
+                new Date().toISOString(),
             };
             this.#prependEvent(activityEvent);
           }

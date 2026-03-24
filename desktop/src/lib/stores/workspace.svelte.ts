@@ -196,7 +196,12 @@ class WorkspaceStore {
     const { agentsStore } = await import("./agents.svelte");
 
     const agents = scan.agents.map(canopyDefToAgent);
-    agentsStore.agents = agents;
+    // Merge scanned agents with existing, deduplicating by ID (API record wins)
+    agentsStore.agents = [
+      ...new Map(
+        [...agents, ...agentsStore.agents].map((a) => [a.id, a]),
+      ).values(),
+    ];
   }
 
   /** Watch active workspace for file changes via Tauri IPC */

@@ -74,20 +74,32 @@ class MemoryStore {
     return counts;
   });
 
+  // Backend may return `content` instead of `value` and `category` instead of `namespace`.
+  #normalizeEntries(entries: MemoryEntry[]): MemoryEntry[] {
+    return entries.map((e) => {
+      const raw = e as unknown as Record<string, unknown>;
+      return {
+        ...e,
+        value: (raw.content as string) ?? e.value,
+        namespace: (raw.category as string) ?? e.namespace,
+      };
+    });
+  }
+
   // ── Fetch ─────────────────────────────────────────────────────────────────────
 
   async fetch(): Promise<void> {
     this.loading = true;
     try {
-      const [entries, namespaces] = await Promise.all([
+      const [rawEntries, namespaces] = await Promise.all([
         memoryApi.list(),
         memoryApi.namespaces(),
       ]);
-      this.entries = entries;
+      this.entries = this.#normalizeEntries(rawEntries);
       this.namespaces = namespaces;
       this.error = null;
       if (this.selected) {
-        const refreshed = entries.find((e) => e.id === this.selected!.id);
+        const refreshed = this.entries.find((e) => e.id === this.selected!.id);
         this.selected = refreshed ?? null;
       }
     } catch (e) {
@@ -113,7 +125,7 @@ class MemoryStore {
     this.isSearching = true;
     try {
       const results = await memoryApi.search(q);
-      this.entries = results;
+      this.entries = this.#normalizeEntries(results);
       this.error = null;
     } catch (e) {
       const msg = (e as Error).message;
@@ -129,8 +141,8 @@ class MemoryStore {
     this.page = 1;
     this.loading = true;
     try {
-      const entries = await memoryApi.list(ns === "all" ? undefined : ns);
-      this.entries = entries;
+      const rawEntries = await memoryApi.list(ns === "all" ? undefined : ns);
+      this.entries = this.#normalizeEntries(rawEntries);
       this.error = null;
     } catch (e) {
       const msg = (e as Error).message;

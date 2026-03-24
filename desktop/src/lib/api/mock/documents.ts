@@ -1,6 +1,6 @@
 import type { Document, DocumentTreeNode } from "../types";
 
-const MOCK_DOCUMENTS: Document[] = [
+let mockDocumentData: Document[] = [
   {
     id: "doc-1",
     title: "README",
@@ -309,13 +309,37 @@ export function getDocumentTree(): DocumentTreeNode[] {
 }
 
 export function getDocuments(): Document[] {
-  return MOCK_DOCUMENTS;
+  return mockDocumentData;
 }
 
 export function getDocumentById(id: string): Document | undefined {
-  return MOCK_DOCUMENTS.find((d) => d.id === id);
+  return mockDocumentData.find((d) => d.id === id);
 }
 
 export function getDocumentByPath(path: string): Document | undefined {
-  return MOCK_DOCUMENTS.find((d) => d.path === path);
+  return mockDocumentData.find((d) => d.path === path);
+}
+
+export function addDocument(doc: Document): void {
+  mockDocumentData = [doc, ...mockDocumentData];
+}
+
+export function updateDocument(
+  id: string,
+  data: Partial<Document>,
+): Document | undefined {
+  const idx = mockDocumentData.findIndex((d) => d.id === id);
+  if (idx === -1) return undefined;
+  mockDocumentData[idx] = {
+    ...mockDocumentData[idx],
+    ...data,
+    updated_at: new Date().toISOString(),
+  };
+  return mockDocumentData[idx];
+}
+
+export function deleteDocument(id: string): boolean {
+  const len = mockDocumentData.length;
+  mockDocumentData = mockDocumentData.filter((d) => d.id !== id);
+  return mockDocumentData.length < len;
 }

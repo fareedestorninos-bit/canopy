@@ -1,6 +1,6 @@
 import type { Skill } from "../types";
 
-const MOCK_SKILLS: Skill[] = [
+let mockSkillData: Skill[] = [
   {
     id: "skill-codegen",
     name: "Code Generation",
@@ -60,5 +60,19 @@ const MOCK_SKILLS: Skill[] = [
 ];
 
 export function mockSkills(): Skill[] {
-  return MOCK_SKILLS;
+  return mockSkillData;
+}
+
+export function getSkillById(id: string): Skill | undefined {
+  return mockSkillData.find((s) => s.id === id);
+}
+
+export function toggleSkill(id: string): Skill | undefined {
+  const idx = mockSkillData.findIndex((s) => s.id === id);
+  if (idx === -1) return undefined;
+  mockSkillData[idx] = {
+    ...mockSkillData[idx],
+    enabled: !mockSkillData[idx].enabled,
+  };
+  return mockSkillData[idx];
 }

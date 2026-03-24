@@ -1,6 +1,6 @@
 import type { SpawnInstance } from "../types";
 
-const MOCK_SPAWN: SpawnInstance[] = [
+let mockSpawnData: SpawnInstance[] = [
   {
     id: "spawn-1",
     agent_id: "agent-3",
@@ -106,18 +106,18 @@ const MOCK_SPAWN: SpawnInstance[] = [
 ];
 
 export function getSpawnInstances(): SpawnInstance[] {
-  return MOCK_SPAWN;
+  return mockSpawnData;
 }
 
 export function getSpawnById(id: string): SpawnInstance | undefined {
-  return MOCK_SPAWN.find((s) => s.id === id);
+  return mockSpawnData.find((s) => s.id === id);
 }
 
 export function createSpawnInstance(
   input: Partial<SpawnInstance>,
 ): SpawnInstance {
   const newInstance: SpawnInstance = {
-    id: `spawn-${MOCK_SPAWN.length + 1}`,
+    id: `spawn-${mockSpawnData.length + 1}`,
     agent_id: input.agent_id ?? "agent-1",
     agent_name: input.agent_name ?? "Scout",
     task: input.task ?? "Ad-hoc task",
@@ -128,6 +128,12 @@ export function createSpawnInstance(
     token_usage: null,
     cost_cents: null,
   };
-  MOCK_SPAWN.unshift(newInstance);
+  mockSpawnData = [newInstance, ...mockSpawnData];
   return newInstance;
+}
+
+export function deleteSpawn(id: string): boolean {
+  const len = mockSpawnData.length;
+  mockSpawnData = mockSpawnData.filter((s) => s.id !== id);
+  return mockSpawnData.length < len;
 }

@@ -1,6 +1,6 @@
 import type { Gateway } from "../types";
 
-const MOCK_GATEWAYS: Gateway[] = [
+let mockGatewayData: Gateway[] = [
   {
     id: "gw-1",
     name: "Anthropic",
@@ -21,5 +21,32 @@ const MOCK_GATEWAYS: Gateway[] = [
 ];
 
 export function mockGateways(): Gateway[] {
-  return MOCK_GATEWAYS;
+  return mockGatewayData;
+}
+
+export function getGatewayById(id: string): Gateway | undefined {
+  return mockGatewayData.find((g) => g.id === id);
+}
+
+export function addGateway(gateway: Gateway): void {
+  mockGatewayData = [gateway, ...mockGatewayData];
+}
+
+export function updateGateway(
+  id: string,
+  data: Partial<Gateway>,
+): Gateway | undefined {
+  const idx = mockGatewayData.findIndex((g) => g.id === id);
+  if (idx === -1) return undefined;
+  mockGatewayData[idx] = {
+    ...mockGatewayData[idx],
+    ...data,
+  };
+  return mockGatewayData[idx];
+}
+
+export function deleteGateway(id: string): boolean {
+  const len = mockGatewayData.length;
+  mockGatewayData = mockGatewayData.filter((g) => g.id !== id);
+  return mockGatewayData.length < len;
 }

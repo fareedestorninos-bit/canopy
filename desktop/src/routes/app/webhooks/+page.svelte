@@ -10,24 +10,44 @@
     void webhooksStore.fetchWebhooks();
   });
 
+  const AVAILABLE_EVENTS = [
+    'agent.started',
+    'agent.completed',
+    'agent.failed',
+    'issue.created',
+    'issue.dispatched',
+  ] as const;
+
+  function generateSecret(): string {
+    const arr = new Uint8Array(24);
+    crypto.getRandomValues(arr);
+    return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
   // Create form state
   let showForm = $state(false);
   let formName = $state('');
   let formUrl = $state('');
-  let formEvents = $state('');
+  let formSelectedEvents = $state<Record<string, boolean>>({});
   let formSecret = $state('');
   let creating = $state(false);
   let formError = $state<string | null>(null);
+
+  function openForm() {
+    formSelectedEvents = Object.fromEntries(AVAILABLE_EVENTS.map((e) => [e, false]));
+    formSecret = generateSecret();
+    showForm = true;
+  }
 
   async function handleCreate() {
     if (!formName.trim() || !formUrl.trim()) return;
     creating = true;
     formError = null;
-    const events = formEvents.split(',').map((e) => e.trim()).filter(Boolean);
+    const events = AVAILABLE_EVENTS.filter((e) => formSelectedEvents[e]);
     const created = await webhooksStore.createWebhook({
       name: formName.trim(),
       url: formUrl.trim(),
-      events,
+      events: [...events],
       secret: formSecret.trim() || null,
     });
     creating = false;
@@ -42,7 +62,7 @@
     showForm = false;
     formName = '';
     formUrl = '';
-    formEvents = '';
+    formSelectedEvents = {};
     formSecret = '';
     formError = null;
   }
@@ -52,7 +72,7 @@
   {#snippet actions()}
     <button
       class="wh-create-btn"
-      onclick={() => showForm = true}
+      onclick={openForm}
       type="button"
       aria-label="Create webhook"
     >
@@ -141,25 +161,26 @@
         />
       </div>
 
-      <div class="wh-field">
-        <label class="wh-label" for="wh-events-input">Events <span class="wh-label-hint">(comma-separated)</span></label>
-        <input
-          id="wh-events-input"
-          class="wh-input"
-          type="text"
-          placeholder="agent.woke, session.completed"
-          bind:value={formEvents}
-        />
-      </div>
+      <fieldset class="wh-fieldset">
+        <legend class="wh-label">Events</legend>
+        <div class="wh-checkboxes">
+          {#each AVAILABLE_EVENTS as ev (ev)}
+            <label class="wh-checkbox-label">
+              <input type="checkbox" bind:checked={formSelectedEvents[ev]} />
+              <span>{ev}</span>
+            </label>
+          {/each}
+        </div>
+      </fieldset>
 
       <div class="wh-field">
-        <label class="wh-label" for="wh-secret-input">Secret <span class="wh-label-hint">(optional)</span></label>
+        <label class="wh-label" for="wh-secret-input">Secret <span class="wh-label-hint">(auto-generated)</span></label>
         <input
           id="wh-secret-input"
-          class="wh-input"
-          type="password"
-          placeholder="Signing secret"
+          class="wh-input wh-input--mono"
+          type="text"
           bind:value={formSecret}
+          readonly
         />
       </div>
 
@@ -240,6 +261,14 @@
     width: 100%; box-sizing: border-box;
   }
   .wh-input:focus { outline: none; border-color: #6366f1; }
+  .wh-input--mono { font-family: var(--font-mono); font-size: 11px; }
+  .wh-fieldset { border: none; padding: 0; margin: 0; }
+  .wh-checkboxes { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .wh-checkbox-label {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dt);
+    cursor: pointer;
+  }
+  .wh-checkbox-label input[type="checkbox"] { accent-color: #6366f1; }
   .wh-form-error { font-size: 12px; color: #fca5a5; margin: 0; }
   .wh-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
   .wh-btn-ghost, .wh-btn-primary {

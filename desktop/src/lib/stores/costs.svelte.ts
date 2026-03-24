@@ -124,21 +124,28 @@ class CostsStore {
   }
 
   async fetchPolicies(workspaceId?: string): Promise<void> {
+    this.isLoading = true;
     try {
       const [policiesData, incidentsData] = await Promise.all([
         costsApi.policies(workspaceId),
         costsApi.incidents(workspaceId),
       ]);
-      this.policies = policiesData.policies ?? [];
+      this.policies =
+        ((policiesData as Record<string, unknown>).budgets as BudgetPolicy[]) ??
+        policiesData.policies ??
+        [];
       this.incidents = incidentsData.incidents ?? [];
     } catch (e) {
       const msg = (e as Error).message;
       this.error = msg;
       toastStore.error("Failed to load budget policies", msg);
+    } finally {
+      this.isLoading = false;
     }
   }
 
   async fetchTrends(workspaceId?: string): Promise<void> {
+    this.isLoading = true;
     try {
       const to = new Date();
       const daysBack =
@@ -155,6 +162,8 @@ class CostsStore {
     } catch {
       // Endpoint may not exist yet — fail silently with empty trend
       this.dailyTrend = [];
+    } finally {
+      this.isLoading = false;
     }
   }
 

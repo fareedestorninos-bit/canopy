@@ -98,6 +98,12 @@ class IssuesStore {
     this.loading = true;
     try {
       this.issues = await issuesApi.list(workspaceId);
+      // Refresh selected from the new array so stale references don't keep
+      // detail panels rendered after the underlying data changes.
+      if (this.selected) {
+        const refreshed = this.issues.find((i) => i.id === this.selected!.id);
+        this.selected = refreshed ?? null;
+      }
       this.error = null;
     } catch (e) {
       const msg = (e as Error).message;

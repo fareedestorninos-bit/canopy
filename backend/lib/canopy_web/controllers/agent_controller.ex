@@ -18,22 +18,9 @@ defmodule CanopyWeb.AgentController do
         true -> query
       end
 
-    agents = Repo.all(query)
+    agents = Repo.all(query) |> Repo.preload([:skills, :schedules])
 
     agent_ids = Enum.map(agents, & &1.id)
-
-    # Batch skill lookup — query all then filter to avoid binary_id encoding in IN clause
-    skills_map =
-      if agent_ids == [] do
-        %{}
-      else
-        Repo.all(
-          from as_ in "agent_skills",
-            select: {type(as_.agent_id, :binary_id), type(as_.skill_id, :binary_id)}
-        )
-        |> Enum.filter(fn {aid, _} -> aid in agent_ids end)
-        |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
-      end
 
     # Batch today's cost stats
     today = Date.utc_today()
@@ -73,10 +60,11 @@ defmodule CanopyWeb.AgentController do
 
     serialized =
       Enum.map(agents, fn agent ->
-        skill_ids = Map.get(skills_map, agent.id, [])
         today_stats = Map.get(cost_stats_map, agent.id)
         last_active = Map.get(last_active_map, agent.id)
-        serialize(agent, today_stats, last_active) |> Map.put(:skills, skill_ids)
+
+        serialize(agent, today_stats, last_active)
+        |> Map.put(:skills, Enum.map(agent.skills, & &1.id))
       end)
 
     json(conn, %{agents: serialized, count: length(serialized)})
@@ -439,7 +427,7 @@ defmodule CanopyWeb.AgentController do
       role: a.role,
       adapter: a.adapter,
       model: a.model,
-      status: a.status,
+      status: map_status(a.status),
       temperature: a.temperature,
       max_concurrent_runs: a.max_concurrent_runs,
       config: a.config,
@@ -477,6 +465,10 @@ defmodule CanopyWeb.AgentController do
       updated_at: a.updated_at
     }
   end
+
+  defp map_status("active"), do: "idle"
+  defp map_status("working"), do: "running"
+  defp map_status(status), do: status
 
   defp format_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->

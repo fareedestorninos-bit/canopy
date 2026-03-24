@@ -8,12 +8,18 @@ class SkillsStore {
   loading = $state(false);
   error = $state<string | null>(null);
 
+  searchQuery = $state("");
+
   // Derived
   enabledCount = $derived(this.skills.filter((s) => s.enabled).length);
   totalCount = $derived(this.skills.length);
 
   filteredSkills = $derived.by(() => {
-    return [...this.skills].sort((a, b) => a.name.localeCompare(b.name));
+    const q = this.searchQuery.toLowerCase().trim();
+    const filtered = q
+      ? this.skills.filter((s) => s.name.toLowerCase().includes(q))
+      : this.skills;
+    return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   });
 
   async fetchSkills(): Promise<void> {

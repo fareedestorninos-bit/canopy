@@ -231,12 +231,15 @@ export interface AgentCreateRequest {
 export type AdapterType =
   | "osa"
   | "claude_code"
+  | "claude-code"
   | "codex"
   | "openclaw"
   | "jidoclaw"
   | "hermes"
   | "bash"
   | "http"
+  | "cursor"
+  | "gemini"
   | "custom";
 
 // ── Agent Hierarchy ───────────────────────────────────────────────────────────

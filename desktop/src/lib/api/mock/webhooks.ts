@@ -1,6 +1,6 @@
 import type { Webhook } from "../types";
 
-const MOCK_WEBHOOKS: Webhook[] = [
+let mockWebhookData: Webhook[] = [
   {
     id: "wh-1",
     name: "GitHub Push Events",
@@ -16,5 +16,32 @@ const MOCK_WEBHOOKS: Webhook[] = [
 ];
 
 export function mockWebhooks(): Webhook[] {
-  return MOCK_WEBHOOKS;
+  return mockWebhookData;
+}
+
+export function getWebhookById(id: string): Webhook | undefined {
+  return mockWebhookData.find((w) => w.id === id);
+}
+
+export function addWebhook(webhook: Webhook): void {
+  mockWebhookData = [webhook, ...mockWebhookData];
+}
+
+export function updateWebhook(
+  id: string,
+  data: Partial<Webhook>,
+): Webhook | undefined {
+  const idx = mockWebhookData.findIndex((w) => w.id === id);
+  if (idx === -1) return undefined;
+  mockWebhookData[idx] = {
+    ...mockWebhookData[idx],
+    ...data,
+  };
+  return mockWebhookData[idx];
+}
+
+export function deleteWebhook(id: string): boolean {
+  const len = mockWebhookData.length;
+  mockWebhookData = mockWebhookData.filter((w) => w.id !== id);
+  return mockWebhookData.length < len;
 }

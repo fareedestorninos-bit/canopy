@@ -1,5 +1,6 @@
 defmodule CanopyWeb.ScheduleController do
   use CanopyWeb, :controller
+  require Logger
 
   alias Canopy.Repo
   alias Canopy.Schemas.{Schedule, Agent, Session}
@@ -256,6 +257,7 @@ defmodule CanopyWeb.ScheduleController do
   defp persist_next_run_at(%Schedule{} = schedule) do
     case compute_next_run_at(schedule.cron_expression) do
       nil ->
+        Logger.warning("Invalid cron expression: #{schedule.cron_expression}")
         schedule
 
       next_run ->

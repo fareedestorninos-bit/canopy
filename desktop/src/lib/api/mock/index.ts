@@ -10,11 +10,16 @@ import {
   clearMockWorkspaceAgents,
   clearAllMockWorkspaceAgents,
 } from "./agents";
-import { mockSchedules } from "./schedules";
-import { mockIssues } from "./issues";
+import {
+  mockSchedules,
+  addSchedule,
+  updateSchedule,
+  deleteSchedule,
+} from "./schedules";
+import { mockIssues, addIssue, updateIssue, deleteIssue } from "./issues";
 import { mockCosts } from "./costs";
 import { mockActivity } from "./activity";
-import { mockSessions } from "./sessions";
+import { mockSessions, addSession, deleteSession } from "./sessions";
 import { getInbox, performInboxAction } from "./inbox";
 import {
   getGoals,
@@ -24,7 +29,14 @@ import {
   updateGoal,
   deleteGoal,
 } from "./goals";
-import { getDocuments, getDocumentTree, getDocumentById } from "./documents";
+import {
+  getDocuments,
+  getDocumentTree,
+  getDocumentById,
+  addDocument,
+  updateDocument,
+  deleteDocument,
+} from "./documents";
 import {
   getProjects,
   getProjectById,
@@ -32,7 +44,7 @@ import {
   updateProject,
   deleteProject,
 } from "./projects";
-import { getSpawnInstances, createSpawnInstance } from "./spawn";
+import { getSpawnInstances, createSpawnInstance, deleteSpawn } from "./spawn";
 import { getMockMessages } from "./chat";
 import {
   getMutableEntries,
@@ -43,11 +55,21 @@ import {
   updateMockEntry,
   deleteMockEntry,
 } from "./memory";
-import { mockSkills } from "./skills";
-import { mockWebhooks } from "./webhooks";
-import { mockAlertRules } from "./alerts";
+import { mockSkills, toggleSkill } from "./skills";
+import {
+  mockWebhooks,
+  addWebhook,
+  updateWebhook,
+  deleteWebhook,
+} from "./webhooks";
+import { mockAlertRules, addAlertRule, deleteAlertRule } from "./alerts";
 import { mockIntegrations, mockAdapters } from "./integrations";
-import { mockGateways } from "./gateways";
+import {
+  mockGateways,
+  addGateway,
+  updateGateway,
+  deleteGateway,
+} from "./gateways";
 import { mockUsers } from "./users";
 import { mockConfig } from "./config";
 import { mockTemplates } from "./templates";
@@ -64,9 +86,16 @@ import type {
   Schedule,
   HeartbeatRun,
   Issue,
+  IssueStatus,
+  IssuePriority,
+  Session,
   Goal,
   GoalStatus,
   GoalPriority,
+  Webhook,
+  AlertRule,
+  Document,
+  Gateway,
 } from "../types";
 
 // Simulated network delay (kept minimal for responsiveness)
@@ -205,7 +234,10 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
     handler: (path, options) => {
       const id = path.split("/")[2];
       const method = (options.method ?? "GET").toUpperCase();
-      if (method === "DELETE") return undefined;
+      if (method === "DELETE") {
+        deleteSession(id);
+        return { ok: true };
+      }
       return mockSessions().find((s) => s.id === id) ?? mockSessions()[0];
     },
   },
@@ -214,8 +246,28 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
     pattern: /^\/sessions$/,
     handler: (_path, options) => {
       if ((options.method ?? "GET").toUpperCase() === "POST") {
-        const sess = mockSessions()[0];
-        return { ...sess, id: `sess-new-${Date.now()}`, status: "active" };
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const now = new Date().toISOString();
+        const newSession: Session = {
+          id: `sess-new-${Date.now()}`,
+          agent_id: (body.agent_id as string) ?? "agent-1",
+          agent_name: (body.agent_name as string) ?? "Scout",
+          title: (body.title as string) ?? "New Session",
+          status: "active",
+          message_count: 0,
+          token_usage: { input: 0, output: 0, cache_read: 0, cache_write: 0 },
+          cost_cents: 0,
+          started_at: now,
+          completed_at: null,
+          created_at: now,
+        };
+        addSession(newSession);
+        return newSession;
       }
       const sessions = mockSessions();
       return { sessions, count: sessions.length };
@@ -267,9 +319,10 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
     handler: (path, options) => {
       const id = path.split("/")[2];
       const method = (options.method ?? "GET").toUpperCase();
-      if (method === "DELETE") return undefined;
-      const sched =
-        mockSchedules().find((s) => s.id === id) ?? mockSchedules()[0];
+      if (method === "DELETE") {
+        deleteSchedule(id);
+        return { ok: true };
+      }
       if (method === "PATCH" && options.body) {
         try {
           const body = JSON.parse(
@@ -277,12 +330,12 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
               ? options.body
               : JSON.stringify(options.body),
           ) as Partial<Schedule>;
-          return { ...sched, ...body, updated_at: new Date().toISOString() };
+          return updateSchedule(id, body) ?? { error: "not_found" };
         } catch {
-          return sched;
+          return mockSchedules().find((s) => s.id === id) ?? mockSchedules()[0];
         }
       }
-      return sched;
+      return mockSchedules().find((s) => s.id === id) ?? mockSchedules()[0];
     },
   },
   {
@@ -290,8 +343,30 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
     pattern: /^\/schedules$/,
     handler: (_path, options) => {
       if ((options.method ?? "GET").toUpperCase() === "POST") {
-        const base = mockSchedules()[0];
-        return { ...base, id: `sched-new-${Date.now()}` };
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const now = new Date().toISOString();
+        const newSchedule: Schedule = {
+          id: `sched-new-${Date.now()}`,
+          agent_id: (body.agent_id as string) ?? "agt-researcher",
+          agent_name: (body.agent_name as string) ?? "Research Agent",
+          cron: (body.cron as string) ?? "0 9 * * 1-5",
+          human_readable: (body.human_readable as string) ?? "",
+          enabled: (body.enabled as boolean) ?? false,
+          context: (body.context as string) ?? "",
+          next_run_at: null,
+          last_run_at: null,
+          last_run_status: null,
+          run_count: 0,
+          created_at: now,
+          updated_at: now,
+        };
+        addSchedule(newSchedule);
+        return newSchedule;
       }
       return { schedules: mockSchedules() };
     },
@@ -325,8 +400,10 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
     handler: (path, options) => {
       const id = path.split("/")[2];
       const method = (options.method ?? "GET").toUpperCase();
-      if (method === "DELETE") return undefined;
-      const issue = mockIssues().find((i) => i.id === id) ?? mockIssues()[0];
+      if (method === "DELETE") {
+        deleteIssue(id);
+        return { ok: true };
+      }
       if (method === "PATCH" && options.body) {
         try {
           const body = JSON.parse(
@@ -334,12 +411,12 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
               ? options.body
               : JSON.stringify(options.body),
           ) as Partial<Issue>;
-          return { ...issue, ...body, updated_at: new Date().toISOString() };
+          return updateIssue(id, body) ?? { error: "not_found" };
         } catch {
-          return issue;
+          return mockIssues().find((i) => i.id === id) ?? mockIssues()[0];
         }
       }
-      return issue;
+      return mockIssues().find((i) => i.id === id) ?? mockIssues()[0];
     },
   },
   {
@@ -347,12 +424,31 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
     pattern: /^\/issues$/,
     handler: (_path, options) => {
       if ((options.method ?? "GET").toUpperCase() === "POST") {
-        const base = mockIssues()[0];
-        return {
-          ...base,
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const now = new Date().toISOString();
+        const newIssue: Issue = {
           id: `iss-new-${Date.now()}`,
-          created_at: new Date().toISOString(),
+          title: (body.title as string) ?? "New Issue",
+          description: (body.description as string | null) ?? null,
+          status: ((body.status as string) ?? "todo") as IssueStatus,
+          priority: ((body.priority as string) ?? "medium") as IssuePriority,
+          assignee_id: (body.assignee_id as string | null) ?? null,
+          assignee_name: (body.assignee_name as string | null) ?? null,
+          project_id: (body.project_id as string) ?? "",
+          goal_id: (body.goal_id as string | null) ?? null,
+          labels: (body.labels as string[]) ?? [],
+          comments_count: 0,
+          created_by: (body.created_by as string) ?? "user",
+          created_at: now,
+          updated_at: now,
         };
+        addIssue(newIssue);
+        return newIssue;
       }
       return { issues: mockIssues() };
     },
@@ -561,17 +657,60 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
   },
   {
     pattern: /^\/documents\/([^/]+)$/,
-    handler: (path) => {
+    handler: (path, options) => {
       const id = path.split("/")[2];
+      const method = (options.method ?? "GET").toUpperCase();
+      if (method === "DELETE") {
+        deleteDocument(id);
+        return { ok: true };
+      }
+      if ((method === "PUT" || method === "PATCH") && options.body) {
+        try {
+          const body = JSON.parse(
+            typeof options.body === "string"
+              ? options.body
+              : JSON.stringify(options.body),
+          ) as Partial<Document>;
+          return {
+            document: updateDocument(id, body) ?? { error: "not_found" },
+          };
+        } catch {
+          return { document: getDocumentById(id) };
+        }
+      }
       return { document: getDocumentById(id) };
     },
   },
   {
     pattern: /^\/documents$/,
-    handler: () => ({
-      documents: getDocuments(),
-      count: getDocuments().length,
-    }),
+    handler: (_path, options) => {
+      if ((options.method ?? "GET").toUpperCase() === "POST") {
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const now = new Date().toISOString();
+        const newDoc: Document = {
+          id: `doc-new-${Date.now()}`,
+          title: (body.title as string) ?? "New Document",
+          path: (body.path as string) ?? "reference/new-doc.md",
+          format: ((body.format as string) ?? "markdown") as Document["format"],
+          project_id: (body.project_id as string) ?? "proj-1",
+          last_edited_by: (body.last_edited_by as string) ?? "User",
+          created_at: now,
+          updated_at: now,
+          content: (body.content as string) ?? "",
+        };
+        addDocument(newDoc);
+        return { document: newDoc };
+      }
+      return {
+        documents: getDocuments(),
+        count: getDocuments().length,
+      };
+    },
   },
 
   // ── Costs ─────────────────────────────────────────────────────────────────────
@@ -627,6 +766,27 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
 
   // ── Inbox ─────────────────────────────────────────────────────────────────────
   {
+    // POST /inbox/read-all
+    pattern: /^\/inbox\/read-all$/,
+    handler: () => {
+      const items = getInbox();
+      for (const item of items) {
+        if (item.status === "unread") item.status = "read";
+      }
+      return { ok: true };
+    },
+  },
+  {
+    // POST /inbox/:id/read
+    pattern: /^\/inbox\/([^/]+)\/read$/,
+    handler: (path) => {
+      const id = path.split("/")[2];
+      const item = getInbox().find((i) => i.id === id);
+      if (item && item.status === "unread") item.status = "read";
+      return { item };
+    },
+  },
+  {
     // POST /inbox/:id/actions/:actionId  or  /inbox/:id/action
     pattern: /^\/inbox\/([^/]+)\/(actions?|dismiss)(\/([^/]+))?$/,
     handler: (path, options) => {
@@ -658,27 +818,63 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
     pattern: /^\/skills\/([^/]+)\/toggle$/,
     handler: (path) => {
       const id = path.split("/")[2];
-      const skill = mockSkills().find((s) => s.id === id) ?? mockSkills()[0];
-      return { ...skill, enabled: !skill.enabled };
+      const toggled = toggleSkill(id);
+      return toggled ?? mockSkills()[0];
     },
   },
   { pattern: /^\/skills$/, handler: () => ({ skills: mockSkills() }) },
 
   // ── Webhooks ──────────────────────────────────────────────────────────────────
   {
-    // DELETE /webhooks/:id
+    // GET/PATCH/DELETE /webhooks/:id
     pattern: /^\/webhooks\/([^/]+)$/,
-    handler: (_path, options) => {
-      if ((options.method ?? "GET").toUpperCase() === "DELETE")
-        return undefined;
-      return mockWebhooks()[0];
+    handler: (path, options) => {
+      const id = path.split("/")[2];
+      const method = (options.method ?? "GET").toUpperCase();
+      if (method === "DELETE") {
+        deleteWebhook(id);
+        return { ok: true };
+      }
+      if (method === "PATCH" && options.body) {
+        try {
+          const body = JSON.parse(
+            typeof options.body === "string"
+              ? options.body
+              : JSON.stringify(options.body),
+          ) as Partial<Webhook>;
+          return updateWebhook(id, body) ?? { error: "not_found" };
+        } catch {
+          return mockWebhooks().find((w) => w.id === id) ?? mockWebhooks()[0];
+        }
+      }
+      return mockWebhooks().find((w) => w.id === id) ?? mockWebhooks()[0];
     },
   },
   {
     pattern: /^\/webhooks$/,
     handler: (_path, options) => {
       if ((options.method ?? "GET").toUpperCase() === "POST") {
-        return { ...mockWebhooks()[0], id: `wh-new-${Date.now()}` };
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const newWebhook: Webhook = {
+          id: `wh-new-${Date.now()}`,
+          name: (body.name as string) ?? "New Webhook",
+          direction: ((body.direction as string) ??
+            "incoming") as Webhook["direction"],
+          url: (body.url as string) ?? "",
+          events: (body.events as string[]) ?? [],
+          secret: (body.secret as string | null) ?? null,
+          enabled: (body.enabled as boolean) ?? true,
+          last_triggered_at: null,
+          failure_count: 0,
+          created_at: new Date().toISOString(),
+        };
+        addWebhook(newWebhook);
+        return newWebhook;
       }
       return { webhooks: mockWebhooks() };
     },
@@ -686,10 +882,45 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
 
   // ── Alerts ────────────────────────────────────────────────────────────────────
   {
+    // DELETE /alerts/rules/:id
+    pattern: /^\/alerts\/rules\/([^/]+)$/,
+    handler: (path, options) => {
+      const id = path.split("/")[3];
+      const method = (options.method ?? "GET").toUpperCase();
+      if (method === "DELETE") {
+        deleteAlertRule(id);
+        return { ok: true };
+      }
+      return mockAlertRules().find((r) => r.id === id) ?? mockAlertRules()[0];
+    },
+  },
+  {
     pattern: /^\/alerts\/rules$/,
     handler: (_path, options) => {
       if ((options.method ?? "GET").toUpperCase() === "POST") {
-        return { ...mockAlertRules()[0], id: `ar-new-${Date.now()}` };
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const newRule: AlertRule = {
+          id: `ar-new-${Date.now()}`,
+          name: (body.name as string) ?? "New Alert Rule",
+          entity_type: ((body.entity_type as string) ??
+            "agent") as AlertRule["entity_type"],
+          field: (body.field as string) ?? "error_rate",
+          operator: ((body.operator as string) ??
+            "gt") as AlertRule["operator"],
+          value: (body.value as string) ?? "0.1",
+          action: ((body.action as string) ?? "notify") as AlertRule["action"],
+          enabled: (body.enabled as boolean) ?? true,
+          triggered_count: 0,
+          last_triggered_at: null,
+          created_at: new Date().toISOString(),
+        };
+        addAlertRule(newRule);
+        return newRule;
       }
       return { rules: mockAlertRules() };
     },
@@ -710,8 +941,58 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
 
   // ── Gateways ──────────────────────────────────────────────────────────────────
   {
+    // GET/PATCH/DELETE /gateways/:id
+    pattern: /^\/gateways\/([^/]+)$/,
+    handler: (path, options) => {
+      const id = path.split("/")[2];
+      const method = (options.method ?? "GET").toUpperCase();
+      if (method === "DELETE") {
+        deleteGateway(id);
+        return { ok: true };
+      }
+      if (method === "PATCH" && options.body) {
+        try {
+          const body = JSON.parse(
+            typeof options.body === "string"
+              ? options.body
+              : JSON.stringify(options.body),
+          ) as Partial<Gateway>;
+          return updateGateway(id, body) ?? { error: "not_found" };
+        } catch {
+          return mockGateways().find((g) => g.id === id) ?? mockGateways()[0];
+        }
+      }
+      return mockGateways().find((g) => g.id === id) ?? mockGateways()[0];
+    },
+  },
+  {
     pattern: /^\/gateways$/,
-    handler: () => ({ gateways: mockGateways() }),
+    handler: (_path, options) => {
+      if ((options.method ?? "GET").toUpperCase() === "POST") {
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const newGateway: Gateway = {
+          id: `gw-new-${Date.now()}`,
+          name: (body.name as string) ?? "New Gateway",
+          provider: (body.provider as string) ?? "anthropic",
+          endpoint: (body.endpoint as string) ?? "",
+          api_key_set: false,
+          is_primary: false,
+          status: "down",
+          latency_ms: null,
+          last_probe_at: null,
+          models: (body.models as string[]) ?? [],
+          created_at: new Date().toISOString(),
+        };
+        addGateway(newGateway);
+        return newGateway;
+      }
+      return { gateways: mockGateways() };
+    },
   },
 
   // ── Workspaces ────────────────────────────────────────────────────────────────
@@ -906,6 +1187,21 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
         (i) => i.status === "running",
       );
       return { instances, count: instances.length };
+    },
+  },
+  {
+    // DELETE /spawn/:id
+    pattern: /^\/spawn\/([^/]+)$/,
+    handler: (path, options) => {
+      const id = path.split("/")[2];
+      const method = (options.method ?? "GET").toUpperCase();
+      if (method === "DELETE") {
+        deleteSpawn(id);
+        return { ok: true };
+      }
+      return (
+        getSpawnInstances().find((s) => s.id === id) ?? getSpawnInstances()[0]
+      );
     },
   },
   {

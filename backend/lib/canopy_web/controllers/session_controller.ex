@@ -228,5 +228,5 @@ defmodule CanopyWeb.SessionController do
     String.replace(content, ~r/[\x00-\x08\x0B\x0C\x0E-\x1F]/, "")
   end
 
-  defp sanitize_content(other), do: inspect(other)
+  defp sanitize_content(other), do: to_string(other)
 end

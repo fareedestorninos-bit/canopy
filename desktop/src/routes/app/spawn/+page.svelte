@@ -22,7 +22,11 @@
     task: string;
     model?: string;
   }) {
-    await spawnStore.createSpawn(data);
+    await spawnStore.createSpawn({
+      agent_id: data.agent_id,
+      task: data.task,
+      model: data.model,
+    });
   }
 
   // Re-fetch agents whenever the active workspace changes (covers onMount + workspace switches)

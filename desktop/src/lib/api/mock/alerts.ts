@@ -1,6 +1,6 @@
 import type { AlertRule } from "../types";
 
-const MOCK_ALERT_RULES: AlertRule[] = [
+let mockAlertRuleData: AlertRule[] = [
   {
     id: "ar-1",
     name: "Agent error rate high",
@@ -17,5 +17,19 @@ const MOCK_ALERT_RULES: AlertRule[] = [
 ];
 
 export function mockAlertRules(): AlertRule[] {
-  return MOCK_ALERT_RULES;
+  return mockAlertRuleData;
+}
+
+export function getAlertRuleById(id: string): AlertRule | undefined {
+  return mockAlertRuleData.find((r) => r.id === id);
+}
+
+export function addAlertRule(rule: AlertRule): void {
+  mockAlertRuleData = [rule, ...mockAlertRuleData];
+}
+
+export function deleteAlertRule(id: string): boolean {
+  const len = mockAlertRuleData.length;
+  mockAlertRuleData = mockAlertRuleData.filter((r) => r.id !== id);
+  return mockAlertRuleData.length < len;
 }

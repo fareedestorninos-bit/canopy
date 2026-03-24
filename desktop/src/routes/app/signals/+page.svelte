@@ -103,14 +103,14 @@
         {#each signalsStore.filteredSignals as signal (signal.id)}
           <div class="sig-row" role="listitem">
             <div class="sig-meta">
-              <span class="sig-channel">{signal.channel}</span>
-              <span class="sig-mode">{signal.mode}</span>
-              <span class="sig-tier sig-tier--{signal.tier}">{signal.tier}</span>
+              <span class="sig-channel">{signal.channel ?? 'unknown'}</span>
+              <span class="sig-mode">{signal.mode ?? 'unknown'}</span>
+              <span class="sig-tier sig-tier--{signal.tier ?? 'haiku'}">{signal.tier ?? 'unknown'}</span>
             </div>
-            <div class="sig-preview">{signal.input_preview}</div>
+            <div class="sig-preview">{signal.input_preview ?? '—'}</div>
             <div class="sig-footer">
-              <span class="sig-agent">{signal.agent_name}</span>
-              <span class="sig-weight">weight: {signal.weight.toFixed(2)}</span>
+              <span class="sig-agent">{signal.agent_name ?? '—'}</span>
+              <span class="sig-weight">weight: {(signal.weight ?? 0).toFixed(2)}</span>
               {#if signal.failure_mode}
                 <span class="sig-fail">{signal.failure_mode}</span>
               {/if}

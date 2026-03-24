@@ -138,6 +138,14 @@ class SessionsStore {
     this.error = null;
     try {
       this.sessions = await sessionsApi.list(workspaceId);
+      // Refresh selectedSession from the new array so stale references don't
+      // keep detail panels rendered after the underlying data changes.
+      if (this.selectedSession) {
+        const refreshed = this.sessions.find(
+          (s) => s.id === this.selectedSession!.id,
+        );
+        this.selectedSession = refreshed ?? null;
+      }
     } catch (e) {
       const msg = (e as Error).message;
       this.error = msg;
