@@ -1,0 +1,274 @@
+defmodule CanopyWeb.WorkflowController do
+  use CanopyWeb, :controller
+  require Logger
+
+  alias Canopy.Repo
+  alias Canopy.Schemas.{Workflow, WorkflowStep, WorkflowRun}
+  import Ecto.Query
+
+  def index(conn, params) do
+    workspace_id = params["workspace_id"]
+
+    query =
+      from w in Workflow,
+        order_by: [asc: w.name],
+        preload: [:steps]
+
+    query =
+      if workspace_id,
+        do: where(query, [w], w.workspace_id == ^workspace_id),
+        else: query
+
+    workflows = Repo.all(query)
+    json(conn, %{workflows: Enum.map(workflows, &serialize/1)})
+  end
+
+  def show(conn, %{"id" => id}) do
+    case Repo.get(Workflow, id) |> maybe_preload() do
+      nil -> conn |> put_status(404) |> json(%{error: "not_found"})
+      workflow -> json(conn, %{workflow: serialize(workflow)})
+    end
+  end
+
+  def create(conn, params) do
+    {step_attrs, workflow_params} = Map.pop(params, "steps", [])
+
+    changeset = Workflow.changeset(%Workflow{}, workflow_params)
+
+    case Repo.insert(changeset) do
+      {:ok, workflow} ->
+        workflow = insert_steps(workflow, step_attrs)
+        workflow = Repo.preload(workflow, [:steps])
+        conn |> put_status(201) |> json(%{workflow: serialize(workflow)})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(422)
+        |> json(%{error: "validation_failed", details: format_errors(changeset)})
+    end
+  end
+
+  def update(conn, %{"id" => id} = params) do
+    case Repo.get(Workflow, id) do
+      nil ->
+        conn |> put_status(404) |> json(%{error: "not_found"})
+
+      workflow ->
+        changeset = Workflow.changeset(workflow, params)
+
+        case Repo.update(changeset) do
+          {:ok, updated} ->
+            updated = Repo.preload(updated, [:steps])
+            json(conn, %{workflow: serialize(updated)})
+
+          {:error, changeset} ->
+            conn
+            |> put_status(422)
+            |> json(%{error: "validation_failed", details: format_errors(changeset)})
+        end
+    end
+  end
+
+  def delete(conn, %{"id" => id}) do
+    case Repo.get(Workflow, id) do
+      nil ->
+        conn |> put_status(404) |> json(%{error: "not_found"})
+
+      workflow ->
+        Repo.delete!(workflow)
+        json(conn, %{ok: true})
+    end
+  end
+
+  def steps(conn, %{"workflow_id" => workflow_id}) do
+    steps =
+      Repo.all(
+        from s in WorkflowStep,
+          where: s.workflow_id == ^workflow_id,
+          order_by: [asc: s.position],
+          preload: [:agent]
+      )
+
+    json(conn, %{steps: Enum.map(steps, &serialize_step/1)})
+  end
+
+  def add_step(conn, %{"workflow_id" => workflow_id} = params) do
+    attrs = Map.put(params, "workflow_id", workflow_id)
+    changeset = WorkflowStep.changeset(%WorkflowStep{}, attrs)
+
+    case Repo.insert(changeset) do
+      {:ok, step} ->
+        step = Repo.preload(step, :agent)
+        conn |> put_status(201) |> json(%{step: serialize_step(step)})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(422)
+        |> json(%{error: "validation_failed", details: format_errors(changeset)})
+    end
+  end
+
+  def remove_step(conn, %{"workflow_id" => _workflow_id, "step_id" => step_id}) do
+    case Repo.get(WorkflowStep, step_id) do
+      nil ->
+        conn |> put_status(404) |> json(%{error: "not_found"})
+
+      step ->
+        Repo.delete!(step)
+        json(conn, %{ok: true})
+    end
+  end
+
+  def runs(conn, %{"workflow_id" => workflow_id}) do
+    runs =
+      Repo.all(
+        from r in WorkflowRun,
+          where: r.workflow_id == ^workflow_id,
+          order_by: [desc: r.inserted_at],
+          limit: 50
+      )
+
+    json(conn, %{runs: Enum.map(runs, &serialize_run/1)})
+  end
+
+  def trigger(conn, %{"workflow_id" => workflow_id} = params) do
+    case Repo.get(Workflow, workflow_id) |> maybe_preload() do
+      nil ->
+        conn |> put_status(404) |> json(%{error: "not_found"})
+
+      workflow ->
+        now = DateTime.utc_now()
+
+        run_attrs = %{
+          workflow_id: workflow.id,
+          status: "pending",
+          trigger_event: params["trigger_event"] || "manual",
+          input: params["input"] || %{},
+          started_at: now
+        }
+
+        changeset = WorkflowRun.changeset(%WorkflowRun{}, run_attrs)
+
+        case Repo.insert(changeset) do
+          {:ok, run} ->
+            Logger.info("Workflow run started: #{run.id} for workflow #{workflow.id}")
+            conn |> put_status(201) |> json(%{run: serialize_run(run)})
+
+          {:error, changeset} ->
+            conn
+            |> put_status(422)
+            |> json(%{error: "validation_failed", details: format_errors(changeset)})
+        end
+    end
+  end
+
+  # ── Private helpers ──────────────────────────────────────────────────────────
+
+  defp maybe_preload(nil), do: nil
+
+  defp maybe_preload(%Workflow{} = w),
+    do: Repo.preload(w, [:steps, :runs])
+
+  defp insert_steps(workflow, step_attrs) when is_list(step_attrs) do
+    Enum.each(step_attrs, fn attrs ->
+      attrs
+      |> Map.put("workflow_id", workflow.id)
+      |> then(&WorkflowStep.changeset(%WorkflowStep{}, &1))
+      |> Repo.insert()
+    end)
+
+    workflow
+  end
+
+  defp insert_steps(workflow, _), do: workflow
+
+  defp serialize(%Workflow{} = w) do
+    step_count =
+      if Ecto.assoc_loaded?(w.steps), do: length(w.steps), else: 0
+
+    last_run_at =
+      if Ecto.assoc_loaded?(w.runs) && length(w.runs) > 0 do
+        w.runs
+        |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
+        |> List.first()
+        |> Map.get(:inserted_at)
+      else
+        nil
+      end
+
+    steps =
+      if Ecto.assoc_loaded?(w.steps),
+        do: Enum.map(w.steps, &serialize_step/1),
+        else: []
+
+    %{
+      id: w.id,
+      name: w.name,
+      slug: w.slug,
+      description: w.description,
+      status: w.status,
+      trigger_type: w.trigger_type,
+      trigger_config: w.trigger_config,
+      created_by: w.created_by,
+      version: w.version,
+      workspace_id: w.workspace_id,
+      organization_id: w.organization_id,
+      step_count: step_count,
+      last_run_at: last_run_at,
+      steps: steps,
+      inserted_at: w.inserted_at,
+      updated_at: w.updated_at
+    }
+  end
+
+  defp serialize_step(%WorkflowStep{} = s) do
+    agent_name =
+      if Ecto.assoc_loaded?(s.agent) && s.agent, do: s.agent.name, else: nil
+
+    agent_emoji =
+      if Ecto.assoc_loaded?(s.agent) && s.agent, do: s.agent.avatar_emoji, else: nil
+
+    %{
+      id: s.id,
+      workflow_id: s.workflow_id,
+      agent_id: s.agent_id,
+      agent_name: agent_name,
+      agent_emoji: agent_emoji,
+      name: s.name,
+      step_type: s.step_type,
+      position: s.position,
+      config: s.config,
+      depends_on: s.depends_on,
+      timeout_seconds: s.timeout_seconds,
+      retry_count: s.retry_count,
+      on_failure: s.on_failure,
+      inserted_at: s.inserted_at,
+      updated_at: s.updated_at
+    }
+  end
+
+  defp serialize_run(%WorkflowRun{} = r) do
+    %{
+      id: r.id,
+      workflow_id: r.workflow_id,
+      status: r.status,
+      trigger_event: r.trigger_event,
+      input: r.input,
+      output: r.output,
+      started_at: r.started_at,
+      completed_at: r.completed_at,
+      error: r.error,
+      step_results: r.step_results,
+      inserted_at: r.inserted_at,
+      updated_at: r.updated_at
+    }
+  end
+
+  defp format_errors(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
+        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+      end)
+    end)
+  end
+end

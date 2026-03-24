@@ -63,6 +63,15 @@ defmodule CanopyWeb.Router do
       post "/message", SessionController, :message, as: :message
     end
 
+    # Workflows
+    resources "/workflows", WorkflowController, except: [:new, :edit] do
+      get "/steps", WorkflowController, :steps, as: :steps
+      post "/steps", WorkflowController, :add_step, as: :add_step
+      delete "/steps/:step_id", WorkflowController, :remove_step, as: :remove_step
+      get "/runs", WorkflowController, :runs, as: :runs
+      post "/trigger", WorkflowController, :trigger, as: :trigger
+    end
+
     # Schedules
     get "/schedules/queue", ScheduleController, :queue
     post "/schedules/wake-all", ScheduleController, :wake_all
@@ -247,7 +256,13 @@ defmodule CanopyWeb.Router do
 
     # Work Products
     get "/issues/:issue_id/work-products", WorkProductController, :index
-    post "/work-products", WorkProductController, :create
+    resources "/work-products", WorkProductController, except: [:new, :edit]
+    post "/work-products/:id/archive", WorkProductController, :archive
+
+    # Analytics
+    get "/analytics/summary", AnalyticsController, :summary
+    get "/analytics/agents", AnalyticsController, :agents
+    get "/analytics/teams", AnalyticsController, :teams
 
     # Config Revisions
     get "/config/revisions", ConfigRevisionController, :index

@@ -79,6 +79,18 @@ import { mockOrganizations, mockOrgMembers } from "./organizations";
 import { mockLabels } from "./labels";
 import { mockPlugins, mockPluginLogs } from "./plugins";
 import {
+  mockWorkflows,
+  getWorkflowById,
+  addWorkflow,
+  updateWorkflow,
+  deleteWorkflow,
+  getWorkflowSteps,
+  addWorkflowStep,
+  removeWorkflowStep,
+  getWorkflowRuns,
+  addWorkflowRun,
+} from "./workflows";
+import {
   mockEnvironmentApps,
   mockEnvironmentAgentApps,
   mockEnvironmentResources,
@@ -89,6 +101,8 @@ import {
 import { mockSignals } from "./signals";
 import { mockAudit } from "./audit";
 import { mockLogs } from "./logs";
+import { mockAnalytics } from "./analytics";
+import { mockWorkProducts } from "./work-products";
 import type {
   CanopyAgent,
   Schedule,
@@ -104,6 +118,9 @@ import type {
   AlertRule,
   Document,
   Gateway,
+  Workflow,
+  WorkflowStep,
+  WorkflowRun,
 } from "../types";
 
 // Simulated network delay (kept minimal for responsiveness)
@@ -377,6 +394,165 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
         return newSchedule;
       }
       return { schedules: mockSchedules() };
+    },
+  },
+
+  // ── Workflows ────────────────────────────────────────────────────────────────
+  {
+    // POST /workflows/:id/trigger
+    pattern: /^\/workflows\/([^/]+)\/trigger$/,
+    handler: (path, options): { run: WorkflowRun } => {
+      const workflowId = path.split("/")[2];
+      let input: Record<string, unknown> = {};
+      try {
+        const body = JSON.parse(options.body as string) as {
+          input?: Record<string, unknown>;
+        };
+        input = body.input ?? {};
+      } catch {
+        /* ignore */
+      }
+      const run: WorkflowRun = {
+        id: `wfr-${Date.now()}`,
+        workflow_id: workflowId,
+        status: "pending",
+        trigger_event: "manual",
+        input,
+        output: {},
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        error: null,
+        step_results: {},
+        inserted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      addWorkflowRun(run);
+      return { run };
+    },
+  },
+  {
+    // GET /workflows/:id/runs
+    pattern: /^\/workflows\/([^/]+)\/runs$/,
+    handler: (path) => {
+      const workflowId = path.split("/")[2];
+      return { runs: getWorkflowRuns(workflowId) };
+    },
+  },
+  {
+    // DELETE /workflows/:id/steps/:stepId
+    pattern: /^\/workflows\/([^/]+)\/steps\/([^/]+)$/,
+    handler: (path) => {
+      const parts = path.split("/");
+      removeWorkflowStep(parts[2], parts[4]);
+      return { ok: true };
+    },
+  },
+  {
+    // GET /workflows/:id/steps + POST /workflows/:id/steps
+    pattern: /^\/workflows\/([^/]+)\/steps$/,
+    handler: (path, options) => {
+      const workflowId = path.split("/")[2];
+      if ((options.method ?? "GET").toUpperCase() === "POST") {
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const now = new Date().toISOString();
+        const name = (body.name as string) ?? "New Step";
+        const newStep: WorkflowStep = {
+          id: `wf-step-new-${Date.now()}`,
+          workflow_id: workflowId,
+          agent_id: (body.agent_id as string) ?? null,
+          agent_name: (body.agent_name as string) ?? null,
+          agent_emoji: (body.agent_emoji as string) ?? null,
+          name,
+          step_type:
+            (body.step_type as string as WorkflowStep["step_type"]) ??
+            "agent_task",
+          position: (body.position as number) ?? 1,
+          config: (body.config as Record<string, unknown>) ?? {},
+          depends_on: (body.depends_on as string[]) ?? [],
+          timeout_seconds: (body.timeout_seconds as number) ?? 300,
+          retry_count: (body.retry_count as number) ?? 0,
+          on_failure:
+            (body.on_failure as string as WorkflowStep["on_failure"]) ?? "stop",
+          inserted_at: now,
+          updated_at: now,
+        };
+        addWorkflowStep(workflowId, newStep);
+        return { step: newStep };
+      }
+      return { steps: getWorkflowSteps(workflowId) };
+    },
+  },
+  {
+    // GET/PATCH/DELETE /workflows/:id
+    pattern: /^\/workflows\/([^/]+)$/,
+    handler: (path, options) => {
+      const id = path.split("/")[2];
+      const method = (options.method ?? "GET").toUpperCase();
+      if (method === "DELETE") {
+        deleteWorkflow(id);
+        return { ok: true };
+      }
+      if (method === "PATCH" && options.body) {
+        try {
+          const body = JSON.parse(
+            typeof options.body === "string"
+              ? options.body
+              : JSON.stringify(options.body),
+          ) as Partial<Workflow>;
+          const updated = updateWorkflow(id, body);
+          return updated ? { workflow: updated } : { error: "not_found" };
+        } catch {
+          const wf = getWorkflowById(id);
+          return wf ? { workflow: wf } : { error: "not_found" };
+        }
+      }
+      const wf = getWorkflowById(id);
+      return wf ? { workflow: wf } : { error: "not_found" };
+    },
+  },
+  {
+    // GET /workflows + POST /workflows
+    pattern: /^\/workflows$/,
+    handler: (_path, options) => {
+      if ((options.method ?? "GET").toUpperCase() === "POST") {
+        let body: Record<string, unknown> = {};
+        try {
+          body = JSON.parse(options.body as string);
+        } catch {
+          /* ignore */
+        }
+        const now = new Date().toISOString();
+        const name = (body.name as string) ?? "New Workflow";
+        const newWorkflow: Workflow = {
+          id: `wf-new-${Date.now()}`,
+          name,
+          slug:
+            (body.slug as string) ?? name.toLowerCase().replace(/\s+/g, "-"),
+          description: (body.description as string) ?? null,
+          status: "draft",
+          trigger_type:
+            (body.trigger_type as string as Workflow["trigger_type"]) ??
+            "manual",
+          trigger_config: {},
+          created_by: null,
+          version: 1,
+          workspace_id: (body.workspace_id as string) ?? null,
+          organization_id: null,
+          step_count: 0,
+          last_run_at: null,
+          steps: [],
+          inserted_at: now,
+          updated_at: now,
+        };
+        addWorkflow(newWorkflow);
+        return { workflow: newWorkflow };
+      }
+      return { workflows: mockWorkflows() };
     },
   },
 
@@ -767,6 +943,53 @@ const routes: Array<{ pattern: RegExp; handler: RouteHandler }> = [
   {
     pattern: /^\/budgets$/,
     handler: () => ({ policies: mockCosts().policies }),
+  },
+
+  // ── Analytics ─────────────────────────────────────────────────────────────────
+  {
+    pattern: /^\/analytics\/summary$/,
+    handler: (_path, _options, rawPath) => {
+      const period =
+        new URL("http://x" + rawPath).searchParams.get("period") ?? "30d";
+      return mockAnalytics(period);
+    },
+  },
+  {
+    pattern: /^\/analytics\/agents$/,
+    handler: (_path, _options, rawPath) => {
+      const period =
+        new URL("http://x" + rawPath).searchParams.get("period") ?? "30d";
+      return { agents: mockAnalytics(period).agent_metrics };
+    },
+  },
+  {
+    pattern: /^\/analytics\/teams$/,
+    handler: (_path, _options, rawPath) => {
+      const period =
+        new URL("http://x" + rawPath).searchParams.get("period") ?? "30d";
+      return { teams: mockAnalytics(period).team_metrics };
+    },
+  },
+
+  // ── Work Products ─────────────────────────────────────────────────────────────
+  {
+    pattern: /^\/work-products\/([^/]+)\/archive$/,
+    handler: () => ({ ok: true }),
+  },
+  {
+    pattern: /^\/work-products\/([^/]+)$/,
+    handler: (path) => {
+      const id = path.split("/")[2];
+      const product = mockWorkProducts().find((p) => p.id === id);
+      return product ? { product } : { error: "not found" };
+    },
+  },
+  {
+    pattern: /^\/work-products$/,
+    handler: () => ({
+      products: mockWorkProducts(),
+      count: mockWorkProducts().length,
+    }),
   },
 
   // ── Activity ──────────────────────────────────────────────────────────────────
@@ -1727,6 +1950,22 @@ const FRESH_WORKSPACE_OVERRIDES: Record<string, unknown> = {
   "/logs": { entries: [] },
   "/spawn/active": { instances: [], count: 0 },
   "/spawn": { instances: [], count: 0 },
+  "/analytics/summary": {
+    period: "30d",
+    agent_metrics: [],
+    team_metrics: [],
+    totals: {
+      total_sessions: 0,
+      total_cost_cents: 0,
+      avg_success_rate: 0,
+      total_tasks: 0,
+      active_agents: 0,
+    },
+    trends: { sessions_by_day: [], costs_by_day: [] },
+  },
+  "/analytics/agents": { agents: [] },
+  "/analytics/teams": { teams: [] },
+  "/work-products": { products: [], count: 0 },
 };
 
 // ── Request handler ────────────────────────────────────────────────────────────

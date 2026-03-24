@@ -309,6 +309,91 @@ export interface CronPreset {
   description: string;
 }
 
+// ── Workflows ─────────────────────────────────────────────────────────────────
+
+export type WorkflowStatus = "draft" | "active" | "paused" | "archived";
+export type WorkflowTriggerType = "manual" | "schedule" | "webhook" | "event";
+export type WorkflowStepType =
+  | "agent_task"
+  | "condition"
+  | "delay"
+  | "webhook"
+  | "transform";
+export type WorkflowRunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+export type StepOnFailure = "stop" | "skip" | "retry" | "fallback";
+
+export interface WorkflowStep {
+  id: string;
+  workflow_id: string;
+  agent_id: string | null;
+  agent_name: string | null;
+  agent_emoji: string | null;
+  name: string;
+  step_type: WorkflowStepType;
+  position: number;
+  config: Record<string, unknown>;
+  depends_on: string[];
+  timeout_seconds: number;
+  retry_count: number;
+  on_failure: StepOnFailure;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowRun {
+  id: string;
+  workflow_id: string;
+  status: WorkflowRunStatus;
+  trigger_event: string | null;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+  started_at: string | null;
+  completed_at: string | null;
+  error: string | null;
+  step_results: Record<string, unknown>;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface Workflow {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: WorkflowStatus;
+  trigger_type: WorkflowTriggerType;
+  trigger_config: Record<string, unknown>;
+  created_by: string | null;
+  version: number;
+  workspace_id: string | null;
+  organization_id: string | null;
+  step_count: number;
+  last_run_at: string | null;
+  steps: WorkflowStep[];
+  inserted_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowCreateRequest {
+  name: string;
+  slug: string;
+  description?: string;
+  trigger_type?: WorkflowTriggerType;
+  workspace_id?: string;
+  steps?: Array<{
+    name: string;
+    agent_id?: string;
+    step_type?: WorkflowStepType;
+    position: number;
+    config?: Record<string, unknown>;
+  }>;
+}
+
 // ── Issues ────────────────────────────────────────────────────────────────────
 
 export type IssueStatus =

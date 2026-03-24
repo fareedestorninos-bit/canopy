@@ -962,6 +962,62 @@ export const schedules = {
     }),
 };
 
+// ── Workflows ─────────────────────────────────────────────────────────────────
+
+export const workflows = {
+  list: async (workspaceId?: string) => {
+    const qs = workspaceId ? `?workspace_id=${workspaceId}` : "";
+    const data = await request<{ workflows: import("./types").Workflow[] }>(
+      `/workflows${qs}`,
+    );
+    return data.workflows ?? [];
+  },
+  get: (id: string) =>
+    request<{ workflow: import("./types").Workflow }>(`/workflows/${id}`).then(
+      (d) => d.workflow,
+    ),
+  create: (body: import("./types").WorkflowCreateRequest) =>
+    request<{ workflow: import("./types").Workflow }>("/workflows", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }).then((d) => d.workflow),
+  update: (
+    id: string,
+    body: Partial<import("./types").WorkflowCreateRequest>,
+  ) =>
+    request<{ workflow: import("./types").Workflow }>(`/workflows/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }).then((d) => d.workflow),
+  delete: (id: string) =>
+    request<void>(`/workflows/${id}`, { method: "DELETE" }),
+  fetchSteps: (workflowId: string) =>
+    request<{ steps: import("./types").WorkflowStep[] }>(
+      `/workflows/${workflowId}/steps`,
+    ).then((d) => d.steps ?? []),
+  addStep: (
+    workflowId: string,
+    body: Partial<import("./types").WorkflowStep>,
+  ) =>
+    request<{ step: import("./types").WorkflowStep }>(
+      `/workflows/${workflowId}/steps`,
+      { method: "POST", body: JSON.stringify(body) },
+    ).then((d) => d.step),
+  removeStep: (workflowId: string, stepId: string) =>
+    request<void>(`/workflows/${workflowId}/steps/${stepId}`, {
+      method: "DELETE",
+    }),
+  fetchRuns: (workflowId: string) =>
+    request<{ runs: import("./types").WorkflowRun[] }>(
+      `/workflows/${workflowId}/runs`,
+    ).then((d) => d.runs ?? []),
+  triggerRun: (workflowId: string, input?: Record<string, unknown>) =>
+    request<{ run: import("./types").WorkflowRun }>(
+      `/workflows/${workflowId}/trigger`,
+      { method: "POST", body: JSON.stringify({ input: input ?? {} }) },
+    ).then((d) => d.run),
+};
+
 // ── Issues ────────────────────────────────────────────────────────────────────
 
 export const issues = {
@@ -1857,6 +1913,29 @@ export const environment = {
       method: "POST",
       body: JSON.stringify({ agent_id: agentId }),
     }),
+};
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+export const analytics = {
+  summary: (period: string) =>
+    request<unknown>(`/analytics/summary?period=${period}`),
+  agents: (period: string) =>
+    request<unknown>(`/analytics/agents?period=${period}`),
+  teams: (period: string) =>
+    request<unknown>(`/analytics/teams?period=${period}`),
+};
+
+// ── Work Products ─────────────────────────────────────────────────────────────
+
+export const workProducts = {
+  list: (filters?: Record<string, string>) => {
+    const qs = filters ? "?" + new URLSearchParams(filters).toString() : "";
+    return request<unknown>(`/work-products${qs}`);
+  },
+  get: (id: string) => request<unknown>(`/work-products/${id}`),
+  archive: (id: string) =>
+    request<void>(`/work-products/${id}/archive`, { method: "POST" }),
 };
 
 // ── Enable/Disable Mock ──────────────────────────────────────────────────────

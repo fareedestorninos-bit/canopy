@@ -23,6 +23,9 @@ defmodule Canopy.Schemas.Agent do
     belongs_to :team, Canopy.Schemas.Team
     has_many :sessions, Canopy.Schemas.Session
     has_many :schedules, Canopy.Schemas.Schedule
+    has_many :app_permissions, Canopy.Schemas.AppPermission
+    has_many :tool_permissions, Canopy.Schemas.ToolPermission
+    has_many :agent_apps, Canopy.Schemas.AgentApp
     many_to_many :skills, Canopy.Schemas.Skill, join_through: "agent_skills"
 
     timestamps()
@@ -30,7 +33,22 @@ defmodule Canopy.Schemas.Agent do
 
   def changeset(agent, attrs) do
     agent
-    |> cast(attrs, [:slug, :name, :role, :adapter, :model, :temperature, :max_concurrent_runs, :status, :config, :system_prompt, :workspace_id, :reports_to, :avatar_emoji, :team_id])
+    |> cast(attrs, [
+      :slug,
+      :name,
+      :role,
+      :adapter,
+      :model,
+      :temperature,
+      :max_concurrent_runs,
+      :status,
+      :config,
+      :system_prompt,
+      :workspace_id,
+      :reports_to,
+      :avatar_emoji,
+      :team_id
+    ])
     |> validate_required([:slug, :name, :role, :adapter, :model, :workspace_id])
     |> validate_inclusion(:status, ~w(active idle working running sleeping error paused))
     |> validate_inclusion(:adapter, ~w(osa claude-code codex bash http openclaw cursor gemini))
