@@ -13,7 +13,7 @@ The desktop command center gives you a native app to hire from 330+ agents, watc
 
 ---
 
-## Quick Start
+## Quick Start 
 
 ```bash
 # Install and launch in one command
